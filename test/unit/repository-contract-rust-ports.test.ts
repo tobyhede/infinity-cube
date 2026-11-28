@@ -50,7 +50,7 @@ const RUST_FILES = [
   ...filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
   'crates/host/tests/startup.rs',
   // The PostgreSQL store's own tests port the TypeScript PostgreSQL files,
-  // which the PostgreSQL adapter below holds, not this list.
+  // which the PostgreSQL adapter below reads, not this list.
   ...filesUnder('crates/host/src', (name) => name.endsWith('.rs')).filter(
     (file) => !file.includes('/sql/postgres/'),
   ),
@@ -94,7 +94,7 @@ const EXEMPT = {
 
   // test/integration/sqlite-space-repository.test.ts
   'names a statement PostgreSQL aborted for contention unavailable': doesNotApply(
-    'a PostgreSQL error code: the Rust host has no PostgreSQL store yet (rust-host 16), and SQLite raises no such code',
+    'a PostgreSQL error code: SQLite raises no such code',
   ),
   'refuses a %s-path commit whose row moved before the lock, writing no Resource':
     doesNotApply(ROW_LOCK),
@@ -139,6 +139,13 @@ const CONTRACT_RUNS = CONTRACT_CASES.flatMap((name) =>
 const OUTSIDE_CASES = Object.fromEntries(OUTSIDE.map((file) => [file, casesOf(file)]));
 
 const CASES = [...CONTRACT_RUNS, ...Object.values(OUTSIDE_CASES).flat()];
+
+/**
+ * The SQLite adapter's runs. Each is marked, and exempted, by the one name it
+ * runs under: a value of a contract case is a run of its own, and a case of
+ * the other files is one run as written.
+ */
+const SQLITE_RUNS = CASES.map((name) => ({ name, run: name }));
 
 const HTTP_CASES = HTTP_CASE_FILES.flatMap(casesOf);
 
@@ -221,22 +228,6 @@ const unrun = (
     .flatMap(({ group, source }) => markedFunctionsOf(group, source))
     .filter((name) => !table.includes(name));
 
-interface Marks {
-  /** The case names the Rust files mark. */
-  readonly marked: readonly string[];
-  readonly exempt: Readonly<Record<string, Exemption>>;
-  /** Names a mark may carry that are another ports test's cases. */
-  readonly elsewhere: readonly string[];
-}
-
-/** What is wrong with the marks and exemptions against `cases`. */
-const findings = (cases: readonly string[], { marked, exempt, elsewhere }: Marks) => ({
-  unported: cases.filter((name) => !marked.includes(name) && !(name in exempt)),
-  unknownMarks: marked.filter((name) => !cases.includes(name) && !elsewhere.includes(name)),
-  unknownExemptions: Object.keys(exempt).filter((name) => !cases.includes(name)),
-  exemptAndPorted: Object.keys(exempt).filter((name) => marked.includes(name)),
-});
-
 /*
  * The Rust PostgreSQL repository is held the same way to every TypeScript
  * case that runs on PostgreSQL (`.scratch/rust-postgresql-store/case-map.md`):
@@ -254,9 +245,11 @@ const findings = (cases: readonly string[], { marked, exempt, elsewhere }: Marks
  * plan's spec gives; owned elsewhere, naming the rust-host ticket that ports it;
  * and accepted difference, naming the decision.
  *
- * The adapter's own files are where its ports are written. The table's marks
- * count as ports only once one of them runs it by invoking
- * `repository_cases!(`: the table runs no case on PostgreSQL until then.
+ * The adapter's own files are where its ports are written, and a file the
+ * HTTP ports test also reads marks them `// TypeScript case: <name>`. The
+ * table's marks count as ports only once one of the adapter's own files runs
+ * it by invoking `repository_cases!(`: the table runs no case on PostgreSQL
+ * until then.
  */
 
 /** A ticket of the rust-postgresql-store plan, as `case-map.md` assigns them. */
@@ -339,7 +332,7 @@ interface ValueRules {
   readonly cells: Readonly<Record<string, string>>;
   /** The values of a table shared by stores that another store's adapter runs. */
   readonly otherStores: Readonly<Record<string, readonly string[]>>;
-  /** The values of a table not written in its file, read from the module that builds it. */
+  /** The values of a table not written in its file, read from the module that builds it; a table written in its file is read there instead. */
   readonly runtime: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -348,10 +341,10 @@ const tableValues = (
   written: Pick<DescribedCase, 'name' | 'table'>,
   rules: ValueRules,
 ): string[] => {
-  const given = rules.runtime[written.name];
-  if (given !== undefined) return [...given];
   const { table } = written;
-  if (table?.rows === undefined) return ['<a table this test cannot read>'];
+  if (table?.rows === undefined) {
+    return [...(rules.runtime[written.name] ?? ['<a table this test cannot read>'])];
+  }
   const cell = rules.cells[written.name];
   return table.rows.map((row) =>
     cell === undefined ? substitutedValue(table.title, row) : (row[cell] ?? '*'),
@@ -385,22 +378,20 @@ const misvalued = (
         : [{ name: written.name, listed, read }];
     });
 
-interface PostgresMarks {
+interface Marks<E> {
   /** The runs the adapter's files mark. */
   readonly marked: readonly string[];
-  readonly exempt: Readonly<Record<string, PostgresExemption>>;
+  readonly exempt: Readonly<Record<string, E>>;
   /** Names a mark may carry that are another ports test's cases. */
   readonly elsewhere: readonly string[];
 }
 
 /** The exemption deciding `run`: one naming its value, or else its case's. */
-const exemptionOf = (
-  { name, run }: Run,
-  exempt: Readonly<Record<string, PostgresExemption>>,
-): PostgresExemption | undefined => exempt[run] ?? exempt[name];
+const exemptionOf = <E>({ name, run }: Run, exempt: Readonly<Record<string, E>>): E | undefined =>
+  exempt[run] ?? exempt[name];
 
-/** What is wrong with the PostgreSQL adapter's marks and exemptions against `runs`. */
-const postgresFindings = (runs: readonly Run[], { marked, exempt, elsewhere }: PostgresMarks) => ({
+/** What is wrong with an adapter's marks and exemptions against `runs`. */
+const findings = <E>(runs: readonly Run[], { marked, exempt, elsewhere }: Marks<E>) => ({
   unported: runs
     .filter((run) => !marked.includes(run.run) && exemptionOf(run, exempt) === undefined)
     .map(({ run }) => run),
@@ -426,7 +417,7 @@ interface Tally {
 
 const postgresTally = (
   runs: readonly Run[],
-  { marked, exempt }: Pick<PostgresMarks, 'marked' | 'exempt'>,
+  { marked, exempt }: Pick<Marks<PostgresExemption>, 'marked' | 'exempt'>,
 ): Tally => {
   const tally: Tally = {
     ported: 0,
@@ -594,7 +585,7 @@ const POSTGRES_VALUES = {
 /**
  * How the values of the sources' per-value cases are read from their tables.
  * The contract's loops are not tables the reader reads: the count of
- * `CONTRACT_RUNS` pins their values.
+ * `CONTRACT_RUNS` pins how many values they run, not which.
  */
 const POSTGRES_VALUE_RULES: ValueRules = {
   cells: {
@@ -700,157 +691,24 @@ const POSTGRES_EXEMPT = {
   'writes a moved Resource through the ownership check, which refuses it before its Space releases it':
     acceptedDifference(CHANGE_ORDER),
 
-  // test/integration/postgres-space-repository.test.ts
-  ...exemptEach(
-    [
-      'refuses a write of text that is not JSON into spaces.document',
-      'settles two overlapping truncations of Spaces stored without Meta as results',
-      'classifies initialization when a concurrent winner takes a shared Resource identity',
-      'conflicts when an authored commit wins after replacement reads its baseline',
-      'conflicts the loser when two replacements overlap on the Meta row lock',
-      'conflicts a replacement authorized against an identity a concurrent replacement retired',
-      'judges a complete-aggregate commit against an identity a concurrent replacement retired',
-      "rolls back an earlier row's relock placeholder when a later row in the same replacement conflicts",
-      'prevents direct deletion of the Meta Space while repository state names it',
-      'commits a topology-preserving edit without waiting for the repository singleton lock',
-      'refuses an unlocked single-Space write whose row moved after it read the revision',
-      'refuses a multi-Space write whose row moved after the conflict check read it',
-      'serializes concurrent topology commits so the loser observes the complete winner',
-    ],
-    pending('07'),
-  ),
-
-  // test/integration/postgres-aggregate-initialization.test.ts
-  ...exemptEach(
-    [
-      'preserves the successful proposal when another initializer already read an empty aggregate',
-      'does not replace a concurrent first aggregate using an absent expected Meta identity',
-      'reads a consistent uninitialized aggregate while another runtime initializes it',
-      'judges a complete-aggregate commit against the aggregate a concurrent initializer establishes',
-      'initializes without losing integrity after $boundary with $expected competing proposal',
-    ],
-    pending('07'),
-  ),
-
-  // test/integration/postgres-misconfiguration.test.ts
-  ...exemptEach(
-    [
-      'leaves the transactional aggregate read unclassified with the raw handshake refusal',
-      'leaves a direct read unclassified with the normalised refusal',
-      'gives up once a second attempt confirms the refusal',
-    ],
-    pending('08'),
-  ),
-
-  // test/integration/prisma-postgres.test.ts
-  ...exemptEach(
-    [
-      'writes and reads a typed space document with its resource',
-      'advances updatedAt when a space is updated',
-    ],
-    pending('05'),
-  ),
-
-  // test/unit/postgres-unreachable.test.ts
-  ...exemptEach(
-    [
-      'names the aggregate read unavailable, keeping the driver error on cause',
-      'names a commit unavailable',
-      'names establishment unavailable',
-      'names %s unavailable, keeping the refusal on the cause chain',
-      'reaches the database on the next read rather than repeating the first failure',
-      'leaves SQLSTATE %s unclassified inside and outside a transaction',
-      'names SQLSTATE %s unavailable inside and outside a transaction',
-      'answers a refused connection on a direct read 503 persistence-unavailable',
-      'answers a wrong password on a direct read 500 internal-error',
-    ],
-    pending('08'),
-  ),
-
-  // test/unit/postgres-aggregate-lock-key.test.ts
-  'is the same key in the exclusive and the shared mode': pending('07'),
-
   // test/unit/prisma-postgres-env-path.test.ts
   'names the root .env from the bundled runtime and from the source alike': acceptedDifference(
     'Q7: Rust searches for the nearest `.env` from the current directory, having no module directory',
   ),
-  'prefers the nearest .env above the starting directory': pending('05'),
-  'answers undefined rather than a path no file sits at': pending('05'),
   'starts from this module’s own directory when given no starting point': acceptedDifference(
     'Q7: Rust starts its search from the current directory',
   ),
 
-  // test/support/fast-path-races.ts
-  ...exemptEach(
-    [
-      'commits a Map-internal Edit under the shared aggregate lock only',
-      'serialises a Map-internal Edit that read first before a Graph deletion that reads after',
-      'serialises a Graph deletion that read first before a Map-internal Edit that reads after',
-      'keeps a replacement that recreates a Space at revision 0 from landing between a fast-path read and its write',
-      'keeps a Space deletion from passing at a revision a written but uncommitted fast path has moved',
-      'lets Map-internal Edits to different Spaces commit side by side where the store runs commits concurrently',
-    ],
-    pending('12'),
-  ),
-
   // test/unit/sql-connection-failure.test.ts, its `postgresSqlStore.isUnavailable` describe
-  ...exemptEach(
-    [
-      'recognises %s whatever its transient flag says',
-      'recognises the socket failure %s the driver normalised',
-      'leaves a host name that does not resolve unclassified when the driver normalised it',
-      'recognises SQLSTATE %s on a statement the driver normalised',
-      'names the set ticket 31 records',
-      'recognises SQLSTATE %s raised while connecting',
-      'leaves SQLSTATE %s raised while connecting unclassified',
-      'recognises the socket failure %s',
-      'leaves the error code %s unclassified',
-      'walks the cause chain to %s',
-      'terminates on a cyclic cause chain',
-      'leaves a defect, an unknown code and a code named only in prose unclassified',
-    ],
-    pending('08'),
-  ),
   'recognises the socket failure %s (EAI_AGAIN)': acceptedDifference(
     'Q5: a temporary resolver failure and a name that does not resolve reach Rust alike, as `Io(Uncategorized)` with no OS error, so Rust leaves both unclassified',
-  ),
-
-  // test/unit/database-startup.test.ts, its PostgreSQL describe
-  ...exemptEach(
-    [
-      'gives up on a wrong password once a second attempt confirms it',
-      'keeps waiting out too many connections past the confirming limit',
-    ],
-    pending('08'),
   ),
 
   // test/integration/aggregate-commit-differential.test.ts
   'gives memory and PostgreSQL the same public outcome over generated aggregate changes':
     pending('11'),
 
-  // test/integration/database-http-runtime.test.ts
-  ...exemptEach(
-    [
-      'establishes Default Content and serves the collection and Meta Space',
-      'recovers through the shared retry after a transient startup failure',
-      'gives up through the shared retry after two confirmed invariant failures',
-    ],
-    pending('09'),
-  ),
-
-  // test/unit/vite-hono-host.test.ts, its PostgreSQL case
-  'composes an application when the repository cannot be reached': pending('09'),
-
   // test/unit/prisma-foundation.test.ts
-  'advances %s.updatedAt when a record is updated': pending('05'),
-  ...exemptEach(
-    [
-      'omits a database connection when DATABASE_URL is blank',
-      'trims a configured DATABASE_URL',
-      'constructs the runtime client without a blank DATABASE_URL binding',
-    ],
-    pending('09'),
-  ),
   ...exemptEach(
     [
       'bootstraps singleton repository state from the legacy Entry Space',
@@ -886,21 +744,32 @@ interface Port {
   readonly table: readonly string[];
   /** The adapter's own files. */
   readonly files: readonly string[];
+  /**
+   * Files whose `// Case:` lines are the HTTP ports test's, where this
+   * adapter's ports are marked `// TypeScript case:` instead.
+   */
+  readonly sharedFiles: readonly string[];
   readonly exempt: Readonly<Record<string, PostgresExemption>>;
 }
 
 const POSTGRES: Port = {
   name: 'the Rust PostgreSQL repository',
   table: filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
-  // Each ticket adds the files it creates: `crates/host/tests/postgres*.rs`
-  // from 05, `crates/cli/tests/serve_postgres.rs` from 09.
-  files: [],
+  files: [
+    'crates/host/tests/postgres.rs',
+    'crates/host/tests/postgres_concurrency.rs',
+    'crates/host/tests/postgres_outages.rs',
+    'crates/host/tests/postgres_races.rs',
+    'crates/host/tests/postgres_url.rs',
+    'crates/host/src/sql/postgres/tests.rs',
+  ],
+  sharedFiles: ['crates/cli/tests/serve_postgres.rs'],
   exempt: POSTGRES_EXEMPT,
 };
 
 const POSTGRES_MARKED = marksOf({
   table: markedIn(POSTGRES.table),
-  own: markedIn(POSTGRES.files),
+  own: [...markedIn(POSTGRES.files), ...markedIn(POSTGRES.sharedFiles, 'TypeScript case')],
   runsTable: POSTGRES.files.some((file) => runsRepositoryCases(readRepositoryFile(file))),
 });
 
@@ -933,7 +802,7 @@ describe('the repository cases the Rust SQLite repository is held to', () => {
 });
 
 describe('the Rust SQLite repository', () => {
-  const found = findings(CASES, {
+  const found = findings(SQLITE_RUNS, {
     marked: markedIn(RUST_FILES),
     exempt: EXEMPT,
     elsewhere: HTTP_CASES,
@@ -1026,7 +895,7 @@ describe('the repository cases the Rust PostgreSQL repository is held to', () =>
 });
 
 describe('the Rust PostgreSQL repository', () => {
-  const found = postgresFindings(POSTGRES_RUNS, {
+  const found = findings(POSTGRES_RUNS, {
     marked: POSTGRES_MARKED,
     exempt: POSTGRES.exempt,
     elsewhere: HTTP_CASES,
@@ -1045,12 +914,15 @@ describe('the Rust PostgreSQL repository', () => {
     expect(found.exemptAndPorted).toEqual([]);
   });
 
-  it('runs no table case yet, so every case not otherwise exempt is pending', () => {
+  it('ports 102 runs in its own files and none through the table, which none of them runs', () => {
+    expect(POSTGRES.files.some((file) => runsRepositoryCases(readRepositoryFile(file)))).toBe(
+      false,
+    );
     expect(
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
-      ported: 0,
-      pending: 179,
+      ported: 102,
+      pending: 77,
       'does not apply': 0,
       'owned elsewhere': 10,
       'accepted difference': 4,
@@ -1075,8 +947,8 @@ describe('the Rust PostgreSQL repository', () => {
 });
 
 describe('the port check', () => {
-  const cases = ['ported', 'inapplicable'];
-  const clean: Marks = {
+  const cases = ['ported', 'inapplicable'].map((name) => ({ name, run: name }));
+  const clean: Marks<Exemption> = {
     marked: ['ported', 'an HTTP case'],
     exempt: { inapplicable: doesNotApply('why') },
     elsewhere: ['an HTTP case'],
@@ -1219,6 +1091,15 @@ describe('the case reader', () => {
     ).toBe(true);
   });
 
+  it('refuses a case that runs over a table its name substitutes nothing of', () => {
+    expect(() =>
+      describedCasesIn('example.ts', "\nit.each(['a', 'b'])('names no value', () => {});"),
+    ).toThrow("example.ts:2: 'names no value' runs over a table and substitutes no value of it");
+    expect(() =>
+      describedCasesIn('example.ts', "test.each(['a'])('names no value', () => {});"),
+    ).toThrow("example.ts:1: 'names no value'");
+  });
+
   it("reads the table a case runs over, with the name that substitutes each row's values", () => {
     const tables = describedCasesIn(
       'example.ts',
@@ -1268,7 +1149,7 @@ describe('the PostgreSQL port check', () => {
   ];
   const values = { 'per %s': ['a', 'b'] };
   const runs = runsOf(cases, values);
-  const clean: PostgresMarks = {
+  const clean: Marks<PostgresExemption> = {
     marked: ['ported', 'per %s (a)', 'an HTTP case'],
     exempt: {
       pending: pending('06'),
@@ -1346,6 +1227,18 @@ describe('the PostgreSQL port check', () => {
     ]);
   });
 
+  it('reads a table written in its file even where its values are given from a module', () => {
+    const read = describedCasesIn('example.ts', "it.each(['08000'])('recognises %s', () => {});");
+    const given = ['08000', '08001'];
+    expect(
+      misvalued(
+        read,
+        { 'recognises %s': given },
+        { cells: {}, otherStores: {}, runtime: { 'recognises %s': given } },
+      ),
+    ).toEqual([{ name: 'recognises %s', listed: given, read: ['08000'] }]);
+  });
+
   it('finds the values of every case under a describe.each unlisted when they are dropped', () => {
     const read = describedCasesIn(
       'example.ts',
@@ -1358,7 +1251,7 @@ describe('the PostgreSQL port check', () => {
   });
 
   it('finds nothing wrong with a case ported, or exempted by its name or one value', () => {
-    expect(postgresFindings(runs, clean)).toEqual({
+    expect(findings(runs, clean)).toEqual({
       unported: [],
       unknownMarks: [],
       unknownExemptions: [],
@@ -1368,27 +1261,23 @@ describe('the PostgreSQL port check', () => {
 
   it('finds an exempt case left out of the adapter: its name dropped from the exemptions', () => {
     expect(
-      postgresFindings(runs, { ...clean, exempt: { 'per %s (b)': acceptedDifference('Q5') } })
-        .unported,
+      findings(runs, { ...clean, exempt: { 'per %s (b)': acceptedDifference('Q5') } }).unported,
     ).toEqual(['pending']);
   });
 
   it('finds a value with neither port nor exemption', () => {
-    expect(postgresFindings(runs, { ...clean, marked: ['ported'] }).unported).toEqual([
-      'per %s (a)',
-    ]);
+    expect(findings(runs, { ...clean, marked: ['ported'] }).unported).toEqual(['per %s (a)']);
   });
 
   it('finds a mark naming no case, and a mark on a per-value case naming no value', () => {
     expect(
-      postgresFindings(runs, { ...clean, marked: [...clean.marked, 'gone', 'per %s'] })
-        .unknownMarks,
+      findings(runs, { ...clean, marked: [...clean.marked, 'gone', 'per %s'] }).unknownMarks,
     ).toEqual(['gone', 'per %s']);
   });
 
   it('finds an exemption naming no case or value', () => {
     expect(
-      postgresFindings(runs, {
+      findings(runs, {
         ...clean,
         exempt: { ...clean.exempt, gone: pending('07'), 'per %s (c)': pending('08') },
       }).unknownExemptions,
@@ -1397,7 +1286,7 @@ describe('the PostgreSQL port check', () => {
 
   it('finds a case or value both ported and exempt, an accepted difference among them', () => {
     expect(
-      postgresFindings(runs, { ...clean, marked: [...clean.marked, 'pending', 'per %s (b)'] })
+      findings(runs, { ...clean, marked: [...clean.marked, 'pending', 'per %s (b)'] })
         .exemptAndPorted,
     ).toEqual(['pending', 'per %s (b)']);
   });

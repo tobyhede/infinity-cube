@@ -1606,7 +1606,7 @@ mod given_an_operation_before_initialization {
         overlap.close().await;
     }
 
-    // Case: initializes without losing integrity after $boundary with $expected competing proposal
+    // Case: initializes without losing integrity after $boundary with $expected competing proposal (meta-read, already-initialized)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn initializes_without_losing_integrity_after_meta_read_with_already_initialized_competing_proposal()
@@ -1617,7 +1617,7 @@ mod given_an_operation_before_initialization {
         .await;
     }
 
-    // Case: initializes without losing integrity after $boundary with $expected competing proposal
+    // Case: initializes without losing integrity after $boundary with $expected competing proposal (meta-read, existing)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn initializes_without_losing_integrity_after_meta_read_with_existing_competing_proposal()
@@ -1628,7 +1628,7 @@ mod given_an_operation_before_initialization {
         .await;
     }
 
-    // Case: initializes without losing integrity after $boundary with $expected competing proposal
+    // Case: initializes without losing integrity after $boundary with $expected competing proposal (meta-delete, already-initialized)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn initializes_without_losing_integrity_after_meta_delete_with_already_initialized_competing_proposal()
