@@ -53,7 +53,7 @@ import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './merm
  */
 
 /** The width Mermaid lays a diagram out at, unseen; the drawn diagram is scaled to the rect's width. */
-const DIAGRAM_LAYOUT_WIDTH = 640;
+const DIAGRAM_WIDTH = 640;
 
 /** The inset the diagram and its notes are drawn at inside the rect. */
 const INSET = 12;
@@ -545,7 +545,7 @@ function MermaidView({
           position: 'absolute',
           left: 0,
           top: 0,
-          width: DIAGRAM_LAYOUT_WIDTH,
+          width: DIAGRAM_WIDTH,
           height: 0,
           overflow: 'hidden',
           visibility: 'hidden',

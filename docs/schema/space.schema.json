@@ -72,7 +72,7 @@
         "x": { "type": "number" },
         "y": { "type": "number" },
         "size": {
-          "description": "Absent means the Closed Size, 260 by 146, which is also the floor on each axis.",
+          "description": "The Display size. It defaults to the Closed Size, 260 by 146, which is also its minimum.",
           "type": "object",
           "required": ["width", "height"],
           "additionalProperties": false,
@@ -82,7 +82,7 @@
           }
         },
         "editSize": {
-          "description": "The Edit size: the size the canvas draws this Resource at while its plugin edits it in place (ADR 0178). It has the floor size has, on an entry of any kind. Absent, nothing is stored and the editor draws at the larger of its plugin's size hint and the Resource's size on each axis, or at the Resource's size with no hint.",
+          "description": "The Edit size on this Map. It has the same minimum as the Display size. If absent, the canvas uses the plugin’s suggested size for its editor, falling back to the Display size. The viewport caps the drawing. Resizing the editor writes this field.",
           "type": "object",
           "required": ["width", "height"],
           "additionalProperties": false,

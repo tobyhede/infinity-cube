@@ -216,17 +216,20 @@ The mapping of Resources to their positions, sizes and Map content within a Map.
 _Avoid_: arrangement, layer.
 
 **Rect**:
-A Resource's drawn box on a Map: its stored position and its size, the Closed Size when none is stored.
+A Resource's drawn box on a Map.
 
 **Closed Size**:
-The size a Resource takes in a Map that stores no size for it, and the least size it may take there.
+The default Display size of a Resource on a Map and the minimum for either size stored on a Map entry.
+
+**Display size**:
+The size at which a Map draws a Resource outside its editor. The Map entry stores it as `size`.
 
 **Edit size**:
-The size a Resource is drawn at on a Map while its plugin edits its content in place, and the size a resize writes then. It is kept for that Resource on that Map, apart from its size.
-_Avoid_: editor size, edit mode.
+The size stored as `editSize` when the author resizes a Resource's editor on a Map. The canvas fits the editor to the visible area.
+_Avoid_: edit mode.
 
 **Size hint**:
-A size a Resource's plugin asks the canvas for on an author's gesture, such as the room its content needs when an edit begins. The canvas decides whether and how far it applies.
+The size a plugin suggests for its editor when the Map entry has no Edit size.
 
 **Shape**:
 An Ur Resource's outline in a Map, kept as its Map content: rectangle, pill, ellipse or diamond.

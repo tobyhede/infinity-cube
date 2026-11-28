@@ -1098,16 +1098,16 @@ test('an embedded editor fits its window and restores the authored framing', asy
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              maps: loaded.snapshot.document.maps?.map((map) =>
-                map.id === DEEP_DIVE_MAP_ID
+              maps: loaded.snapshot.document.maps?.map((candidate) =>
+                candidate.id === DEEP_DIVE_MAP_ID
                   ? {
-                      ...map,
+                      ...candidate,
                       positions: {
-                        ...map.positions,
+                        ...candidate.positions,
                         [DEEP_DIVE_SECOND_ID]: { x: 432, y: 12, editSize, content: { open: true } },
                       },
                     }
-                  : map,
+                  : candidate,
               ),
             },
           },

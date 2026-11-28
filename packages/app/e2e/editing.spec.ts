@@ -570,6 +570,40 @@ async function seedEditorMap(page: Page, title: string, size: { width: number; h
   );
 }
 
+function editorRect(resource: Locator) {
+  return resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    return {
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    };
+  });
+}
+
+test('a new edit measures the saved source and keeps that size while typing', async ({ page }) => {
+  const seeded = await seedEditorMap(page, 'Source dimensions', { width: 700, height: 350 });
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Source dimensions');
+  await settled(page);
+  const resource = seededNode(page, SHORT_NOTE);
+  const textbox = page.getByRole('textbox', { name: 'Markdown source of Note' });
+  const edit = async () => {
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource Note' }).click();
+    await expect(textbox).toBeFocused();
+  };
+  await edit();
+  await expect.poll(async () => (await editorRect(resource)).width).toBeLessThan(700);
+  const short = await editorRect(resource);
+  await textbox.fill('A longer line of Markdown source for the editor to lay out.\n'.repeat(4));
+  expect(await editorRect(resource)).toEqual(short);
+  await textbox.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(textbox).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await edit();
+  await expect.poll(async () => (await editorRect(resource)).width).toBeGreaterThan(short.width);
+  await expect.poll(async () => (await editorRect(resource)).height).toBeGreaterThan(short.height);
+});
+
 test('An edit draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps', async ({
   page,
 }) => {
@@ -579,14 +613,7 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
   await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
   await settled(page);
   const resource = seededNode(page, SHORT_NOTE);
-  const rect = async () =>
-    resource.evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished));
-      return {
-        width: Number.parseFloat(getComputedStyle(element).width),
-        height: Number.parseFloat(getComputedStyle(element).height),
-      };
-    });
+  const rect = () => editorRect(resource);
   const stored = async () => {
     const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
     expect(response.ok()).toBe(true);
@@ -623,22 +650,7 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
   await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
   expect(await stored()).not.toHaveProperty('editSize');
   const measured = await rect();
-  const textbox = page.getByRole('textbox', { name: 'Markdown source of Note' });
-  const save = async () => {
-    await textbox.press(`${PRIMARY_MODIFIER}+Enter`);
-    await expect(textbox).toHaveCount(0);
-    await expect(persistence).toHaveText('Persisted');
-  };
-
-  // Typing keeps the current size. Starting the next edit measures the saved source.
-  await textbox.fill('A longer line of Markdown source for the editor to lay out.\n'.repeat(4));
-  expect(await rect()).toEqual(measured);
-  await save();
-  await edit();
-  await expect.poll(async () => (await rect()).width).toBeGreaterThan(measured.width);
-  await expect.poll(async () => (await rect()).height).toBeGreaterThan(measured.height);
-  await textbox.fill('Short note');
-  await save();
+  await cancel();
   await zoomCamera(page, 'Zoom out');
   await edit();
   await expect.poll(rect).toEqual(measured);
