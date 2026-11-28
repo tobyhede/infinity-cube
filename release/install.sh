@@ -11,7 +11,7 @@
 #   INFINITY_CUBE_VERSION       the release to install, `v0.1.0-preview.1` or
 #                               `0.1.0-preview.1`; the newest published one
 #                               when unset
-#   INFINITY_CUBE_INSTALL_DIR   where the binary goes; ~/.local/bin when unset
+#   INFINITY_CUBE_INSTALL_DIR   where --cli puts the binary; ~/.local/bin when unset
 #   INFINITY_CUBE_REPO          the GitHub repository; tobyhede/infinity-cube
 #   INFINITY_CUBE_DOWNLOAD_URL  the URL holding the archive and SHA256SUMS,
 #                               in place of the release's; it needs
@@ -36,6 +36,25 @@ fail() {
 
 need() {
 	command -v "$1" >/dev/null 2>&1 || fail "this script needs $1, which is not on PATH"
+}
+
+quote() {
+	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+offer_cli() {
+	settings=""
+	if [ -n "$requested" ]; then
+		settings="INFINITY_CUBE_VERSION=$(quote "$requested") "
+	fi
+	if [ -n "${INFINITY_CUBE_REPO:-}" ]; then
+		settings="${settings}INFINITY_CUBE_REPO=$(quote "$repo") "
+	fi
+	if [ -n "$download_url" ]; then
+		settings="${settings}INFINITY_CUBE_DOWNLOAD_URL=$(quote "$download_url") "
+	fi
+	fail "the desktop preview requires a Mac with Apple silicon. For the CLI, run:
+  curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | ${settings}sh -s -- --cli"
 }
 
 # The Rust target an archive is named for.
@@ -146,7 +165,15 @@ install_desktop() {
 	mkdir -p "$install_dir"
 	destination="$install_dir/InfinityCube.app"
 	stage_dir="$install_dir/.infinity-cube-install"
-	mkdir "$stage_dir" || fail "could not reserve $stage_dir for this install"
+	if ! mkdir "$stage_dir"; then
+		if [ -d "$stage_dir" ]; then
+			if [ -d "$stage_dir/previous.app" ]; then
+				fail "another install may be using $stage_dir. Once no other install is running, if $destination is missing, move $stage_dir/previous.app to $destination. Then move the remaining staging folder aside and retry"
+			fi
+			fail "another install may be using $stage_dir. Once no other install is running, move the folder aside if it remains, then retry"
+		fi
+		fail "could not reserve $stage_dir for this install"
+	fi
 	desktop_stage="$stage_dir"
 	new_app="$desktop_stage/InfinityCube.app"
 	ditto "$volume/InfinityCube.app" "$new_app" || fail "could not copy InfinityCube from $archive"
@@ -239,10 +266,11 @@ main() {
 	need uname
 	need mktemp
 	target="$(detect_target)"
+	repo="${INFINITY_CUBE_REPO:-tobyhede/infinity-cube}"
+	download_url="${INFINITY_CUBE_DOWNLOAD_URL:-}"
+	requested="${INFINITY_CUBE_VERSION:-}"
 	if [ "$mode" = desktop ]; then
-		[ "$target" = aarch64-apple-darwin ] ||
-			fail "the desktop preview requires a Mac with Apple silicon. For the CLI, run:
-  curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh -s -- --cli"
+		[ "$target" = aarch64-apple-darwin ] || offer_cli
 		need hdiutil
 		need ditto
 		need codesign
@@ -250,9 +278,6 @@ main() {
 		need tar
 	fi
 
-	repo="${INFINITY_CUBE_REPO:-tobyhede/infinity-cube}"
-	download_url="${INFINITY_CUBE_DOWNLOAD_URL:-}"
-	requested="${INFINITY_CUBE_VERSION:-}"
 	work="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-install.XXXXXX")"
 	staged=""
 	desktop_stage=""

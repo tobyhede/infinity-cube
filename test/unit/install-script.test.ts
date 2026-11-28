@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 // Runs release/install.sh (Storage ST-129) as a person runs it, against a
 // fake release on disk. Each build job in .github/workflows/release.yml
@@ -93,6 +94,65 @@ function install(
 
 const realPath = process.env['PATH'] ?? '/usr/bin:/bin';
 
+async function fakeDesktopRelease(root: string): Promise<string> {
+  const tools = join(root, 'tools');
+  await mkdir(tools);
+  await executable(tools, 'uname', 'case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; esac');
+  await executable(
+    tools,
+    'hdiutil',
+    [
+      'operation="$1"; shift',
+      'case "$operation" in',
+      'attach)',
+      '  while [ "$#" -gt 0 ]; do',
+      '    case "$1" in',
+      '      -mountpoint) mount="$2"; shift 2 ;;',
+      '      -*) shift ;;',
+      '      *) image="$1"; shift ;;',
+      '    esac',
+      '  done',
+      '  mkdir -p "$mount/InfinityCube.app"',
+      '  cp "$image" "$mount/InfinityCube.app/fixture" ;;',
+      'detach) rm -r "$1" ;;',
+      'esac',
+    ].join('\n'),
+  );
+  await executable(tools, 'ditto', 'cp -R "$1" "$2"');
+  await executable(tools, 'codesign', 'test -f "$4/fixture"');
+  const archive = `InfinityCube-${version}-aarch64-apple-darwin.dmg`;
+  const image = 'fake disk image';
+  await writeFile(join(root, archive), image);
+  await writeFile(
+    join(root, 'SHA256SUMS'),
+    `${createHash('sha256').update(image).digest('hex')}  ${archive}\n`,
+  );
+  return `${tools}${delimiter}${realPath}`;
+}
+
+function installDesktop(toolPath: string, root: string): Run {
+  return install(
+    toolPath,
+    root,
+    { INFINITY_CUBE_VERSION: version, INFINITY_CUBE_DOWNLOAD_URL: `file://${root}` },
+    [],
+  );
+}
+
+async function existingDesktopApp(root: string, identifier: string): Promise<string> {
+  const app = join(root, 'Applications', 'InfinityCube.app');
+  await mkdir(join(app, 'Contents'), { recursive: true });
+  await writeFile(
+    join(app, 'Contents', 'Info.plist'),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+  <dict><key>CFBundleIdentifier</key><string>${identifier}</string></dict>
+</plist>
+`,
+  );
+  return app;
+}
+
 describe('release/install.sh', () => {
   it('offers the CLI on Linux when invoked without arguments', async () => {
     const root = await temporaryDirectory();
@@ -110,37 +170,122 @@ describe('release/install.sh', () => {
 
   it('installs the checked desktop bundle into Applications and tells the user to open it', async () => {
     const root = await temporaryDirectory();
-    const tools = join(root, 'tools');
-    await mkdir(tools);
-    await executable(tools, 'uname', 'case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; esac');
-    await executable(
-      tools,
-      'hdiutil',
-      'case "$1" in attach) mkdir -p "$5/InfinityCube.app"; cp "$6" "$5/InfinityCube.app/fixture" ;; detach) rm -r "$2" ;; esac',
-    );
-    await executable(tools, 'ditto', 'cp -R "$1" "$2"');
-    await executable(tools, 'codesign', 'test -f "$4/fixture"');
-    const archive = `InfinityCube-${version}-aarch64-apple-darwin.dmg`;
-    const image = 'fake disk image';
-    await writeFile(join(root, archive), image);
-    await writeFile(
-      join(root, 'SHA256SUMS'),
-      `${createHash('sha256').update(image).digest('hex')}  ${archive}\n`,
-    );
+    const toolPath = await fakeDesktopRelease(root);
 
-    const result = install(
-      `${tools}${delimiter}${realPath}`,
-      root,
-      { INFINITY_CUBE_VERSION: version, INFINITY_CUBE_DOWNLOAD_URL: `file://${root}` },
-      [],
-    );
+    const result = installDesktop(toolPath, root);
 
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Open InfinityCube from ~/Applications.');
     const applications = join(root, 'Applications');
     expect(await readdir(applications)).toEqual(['InfinityCube.app']);
-    expect(await readFile(join(applications, 'InfinityCube.app', 'fixture'), 'utf8')).toBe(image);
+    expect(await readFile(join(applications, 'InfinityCube.app', 'fixture'), 'utf8')).toBe(
+      'fake disk image',
+    );
+  });
+
+  it('explains how to recover a previous app left in the desktop staging folder', async () => {
+    const root = await temporaryDirectory();
+    const toolPath = await fakeDesktopRelease(root);
+    const staging = join(root, 'Applications', '.infinity-cube-install');
+    const previous = join(staging, 'previous.app');
+    await mkdir(previous, { recursive: true });
+
+    const result = installDesktop(toolPath, root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(previous);
+    expect(result.stderr).toContain('move');
+    expect(await readdir(staging)).toEqual(['previous.app']);
+  });
+
+  it.runIf(process.platform === 'darwin')(
+    'replaces an existing app with the desktop bundle identifier',
+    async () => {
+      const root = await temporaryDirectory();
+      const toolPath = await fakeDesktopRelease(root);
+      const path = resolve(import.meta.dirname, '../../packages/desktop/src-tauri/tauri.conf.json');
+      const configuration = z
+        .object({ identifier: z.string() })
+        .parse(JSON.parse(await readFile(path, 'utf8')));
+      const app = await existingDesktopApp(root, configuration.identifier);
+
+      const result = installDesktop(toolPath, root);
+
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+      expect(await readdir(join(root, 'Applications'))).toEqual(['InfinityCube.app']);
+      expect(await readdir(app)).toEqual(['fixture']);
+    },
+  );
+
+  it.runIf(process.platform === 'darwin')('leaves an unrelated app in place', async () => {
+    const root = await temporaryDirectory();
+    const toolPath = await fakeDesktopRelease(root);
+    const app = await existingDesktopApp(root, 'dev.example.other');
+
+    const result = installDesktop(toolPath, root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('belongs to another app');
+    expect(await readdir(join(root, 'Applications'))).toEqual(['InfinityCube.app']);
+    expect(await readFile(join(app, 'Contents', 'Info.plist'), 'utf8')).toContain(
+      'dev.example.other',
+    );
+  });
+
+  it('leaves an app with no bundle identifier in place', async () => {
+    const root = await temporaryDirectory();
+    const toolPath = await fakeDesktopRelease(root);
+    const app = join(root, 'Applications', 'InfinityCube.app');
+    await mkdir(app, { recursive: true });
+    await writeFile(join(app, 'existing'), 'an app without an Info.plist');
+
+    const result = installDesktop(toolPath, root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('already exists');
+    expect(await readdir(join(root, 'Applications'))).toEqual(['InfinityCube.app']);
+    expect(await readFile(join(app, 'existing'), 'utf8')).toBe('an app without an Info.plist');
+  });
+
+  it('keeps the selected release and settings in the CLI hint', async () => {
+    const root = await temporaryDirectory();
+    const tools = join(root, 'tools');
+    await mkdir(tools);
+    await executable(tools, 'uname', 'case "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac');
+    const toolPath = `${tools}${delimiter}${realPath}`;
+    const downloadUrl = "file:///tmp/Alice's previews";
+    const result = install(
+      toolPath,
+      root,
+      {
+        INFINITY_CUBE_VERSION: version,
+        INFINITY_CUBE_REPO: 'example/infinity-cube',
+        INFINITY_CUBE_DOWNLOAD_URL: downloadUrl,
+      },
+      [],
+    );
+
+    const command = result.stderr.split('\n').find((line) => line.trimStart().startsWith('curl '));
+    if (!command) throw new Error('The fallback did not give a curl command');
+    await executable(
+      tools,
+      'curl',
+      `echo 'printf "%s\\n" "$INFINITY_CUBE_VERSION" "$INFINITY_CUBE_REPO" "$INFINITY_CUBE_DOWNLOAD_URL" "$1"'`,
+    );
+    const retry = spawnSync('sh', ['-c', command], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { PATH: toolPath, HOME: root },
+    });
+    expect(retry.status).toBe(0);
+    expect(retry.stdout.trimEnd().split('\n')).toEqual([
+      version,
+      'example/infinity-cube',
+      downloadUrl,
+      '--cli',
+    ]);
   });
 
   it('leaves no staged copy in the install folder when installing fails after copying', async () => {

@@ -18,7 +18,9 @@ Run this once on a Mac with Apple silicon.
 curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
 ```
 
-Open `~/Applications` in Finder and double-click **InfinityCube**. The **Start window** lets you open an existing folder or create a Space.
+1. Open `~/Applications` in Finder and double-click **InfinityCube**.
+2. In the **Start window**, choose **New Space**. Check the name and folder, then choose **Create Space**. To open a Space you already have, choose **Open Folder…**.
+3. Follow the [git instructions for your Space](#use-a-space) before you edit.
 
 ### The `infinity-cube` command on macOS or Linux
 
