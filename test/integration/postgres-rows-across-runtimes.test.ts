@@ -56,13 +56,16 @@ const expectWhatTheScriptNames = async (repository: SpaceRepository): Promise<vo
     series: [],
     label: 'edited',
   });
-  const map = space?.document.maps?.[0];
-  expect(Object.keys(map?.positions ?? {}), "the Map's placements").toHaveLength(8);
+  const firstMap = space?.document.maps?.[0];
+  expect(Object.keys(firstMap?.positions ?? {}), "the Map's placements").toHaveLength(8);
   expect(
-    map?.positions[CHART],
+    firstMap?.positions[CHART],
     "the chart's position, size, absent Edit size and Map content",
   ).toStrictEqual({ x: 0, y: 300, size: { width: 320, height: 180 }, content: { zoom: 2 } });
-  expect(map?.graphs[0]?.edges, 'the Edges, each Title and whether it is hidden').toStrictEqual([
+  expect(
+    firstMap?.graphs[0]?.edges,
+    'the Edges, each Title and whether it is hidden',
+  ).toStrictEqual([
     { from: 'e0000000-0000-4000-8000-000000000002', to: 'e0000000-0000-4000-8000-000000000005' },
     {
       from: 'e0000000-0000-4000-8000-000000000005',
