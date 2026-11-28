@@ -88,11 +88,11 @@ _Avoid_: heading, label, caption, description, subtitle as separate fields.
 The first Title Line, followed by “…” when more lines follow, used when a sentence quotes a Title, including questions, notices and Edge labels. Controls, list rows and chrome use the first line alone.
 
 **Resource kind**:
-What a Resource's content is and does, and the name that selects its Resource plugin. See [Space and Resources](docs/requirements/space-and-resources.md#kinds) for the bundled kinds.
+A name that selects a Resource plugin. The plugin defines the Resource's content and behaviour. The six bundled kinds are Markdown, Space, Image, Ur, Reference, and Mermaid. See [Space and Resources](docs/requirements/space-and-resources.md#kinds).
 _Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
 
 **Content kind**:
-A Resource kind whose Resource content names bytes.
+A Resource kind whose Resource content names bytes. Markdown, Mermaid, and Image are Content kinds. Ur, Reference, and Space are Resource kinds but not Content kinds.
 
 **Missing kind**:
 A well-formed Resource kind that no Resource plugin in this build draws. Its Resources are drawn by the Default plugin.
@@ -461,7 +461,7 @@ The on-disk form of an Aggregate, suitable for review, version control and shari
 _Avoid_: catalog, bundle, export root.
 
 **Repository**:
-The store that holds the live Aggregate and answers reads and commits.
+The store for the live Aggregate. The Repository serves reads and commits using PostgreSQL, SQLite, or memory.
 
 **Invariant failure**:
 A Repository holding something InfinityCube cannot read an Aggregate from: stored state that contradicts itself, such as Meta naming a Space the Repository does not hold, or a Repository missing what an Aggregate is kept in. It is not expected to clear on its own, so a failure the next read does not repeat was not one.

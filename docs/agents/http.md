@@ -4,7 +4,7 @@ Read this for the Fetch application in `packages/http` and its Hono adapters. Th
 
 ## Hono reference
 
-Consult Hono's [RPC guide](https://hono.dev/docs/guides/rpc) for inferred client types and [best practices](https://hono.dev/docs/guides/best-practices) for route composition. Use the [full docs](https://hono.dev/llms-full.txt) when those pages omit the relevant API.
+Consult Hono's [RPC guide](https://hono.dev/docs/guides/rpc) for inferred client types and [best practices](https://hono.dev/docs/guides/best-practices) for route composition. Use the [full docs](https://hono.dev/llms-full.txt) when those pages omit the relevant API. For `bodyLimit`, use the full reference because `llms-small.txt` omits it.
 
 ## Route handling and media validation
 
