@@ -2,18 +2,17 @@ import { readFileSync } from 'node:fs';
 import { MemorySpaceRepository } from '@project/aggregate';
 import { describe, expect, it } from 'vitest';
 import { openSqliteRepository } from '../support/sqlite-harness';
+import { runRowsScript, scriptAssets } from '../support/rows-script';
 import {
   REGENERATE_TYPESCRIPT_ROWS,
   RUST_ROWS,
-  runRowsScript,
-  scriptAssets,
   TYPESCRIPT_ROWS,
   typescriptRows,
 } from '../support/sqlite-rows';
 
 // Rows read across runtimes (Storage ST-125), with
 // `crates/host/tests/sqlite_rows.rs` the Rust half: each runtime runs
-// `conformance/sqlite-rows/script.json` on a migrated file and its rows are
+// `conformance/rows/script.json` on a migrated file and its rows are
 // checked in, and each reads the other's.
 describe('SQLite rows across runtimes', () => {
   it('holds the checked-in TypeScript rows to what the script writes now', async () => {
