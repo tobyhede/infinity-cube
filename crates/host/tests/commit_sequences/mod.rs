@@ -2,20 +2,23 @@
 //! and run by every durable store against the memory store:
 //! `tests/store_properties.rs` on a SQLite file and
 //! `tests/postgres_properties.rs` on a PostgreSQL database. Every step
-//! answers the same on both stores, and both hold the same aggregate at the
-//! end, the durable store read again by a fresh repository.
+//! answers the same on both stores, both hold the same aggregate after
+//! every step, and both hold it at the end, the durable store read again by
+//! a fresh repository.
 //!
-//! A case starts from Meta and two linked Spaces, each at revision 0 or
-//! within two of the ceiling, and takes up to eleven steps: renames and
-//! Resources added or dropped at a current, stale or ahead revision; a
-//! Resource moved between Spaces, the receiver listed first or last; a Space
-//! created, linked from Meta or not, one already stored among them; a Space
-//! linked from another, stored or not; a Space deleted, Meta among them, the
-//! Spaces linking it left alone, changed but still linking, or unlinked, the
+//! A case starts from Meta and two Spaces Meta's Space Resources refer to,
+//! each at revision 0 or within two of the ceiling, and takes up to eleven
+//! steps: renames and Resources added or dropped at a current, stale or
+//! ahead revision; a Resource moved between Spaces, the receiver listed
+//! first or last; a Space created, referred to from Meta or not, one already
+//! stored among them; a Space Resource added to a stored Space, referring to
+//! a Space stored or not; a Space deleted, Meta among them, the Spaces
+//! referring to it left alone, changed but still referring, the first kept
+//! and the rest dropping their Space Resources, or all dropping them, the
 //! delete listed first or last; a Graph Meta selects removed or one added;
 //! Resources placed and an Edge drawn (a Map-internal Edit); one Space
-//! changed twice in a commit; and an update whose snapshot names another
-//! Space. Some Resources belong to no plugin and hold content whose keys are
+//! changed twice in a commit; an update whose snapshot names another Space;
+//! and an Export recorded at a Space's revision or behind it. Some Resources belong to no plugin and hold content whose keys are
 //! out of `jsonb`'s order (by length, then by bytes) and out of ascending
 //! order, as do their placements' Map content, and a Map's positions are
 //! listed out of Resource id order.
@@ -54,8 +57,8 @@ use serde_json::Value;
 
 pub use crate::repository_contract::KeyOrder;
 use crate::repository_contract::{
-    EMPTY_ASSET_REF, SPACE_ID, id, resource, snapshot, snapshot_text, space_holding,
-    space_json, space_resource, target_document,
+    EMPTY_ASSET_REF, SPACE_ID, id, resource, snapshot, snapshot_text, space_holding, space_json,
+    space_resource, target_document,
 };
 
 /// The Spaces a generated case can name: Meta, then the ordinary ones, the
@@ -80,9 +83,9 @@ fn chart_id(index: u8) -> String {
     format!("c2000000-0000-4000-8000-0000000003{:02x}", index % 4)
 }
 
-/// The id of the Space Resource through which Meta links ordinary Space
-/// `index`.
-fn link_resource_id(index: usize) -> String {
+/// The id of the Space Resource through which Meta refers to ordinary
+/// Space `index`.
+fn meta_space_resource_id(index: usize) -> String {
     format!("c2000000-0000-4000-8000-0000000002{index:02x}")
 }
 
@@ -117,18 +120,21 @@ fn chart_map_content() -> JsonValue {
     intake::json::parse(r#"{"zoom":2,"at":["ink",{"label":"x","id":7}]}"#).unwrap()
 }
 
-fn link(index: usize) -> Resource {
+fn meta_space_resource(index: usize) -> Resource {
     let holder = space_holding(
         SPACE_ID,
         "Holder",
-        vec![space_resource(&link_resource_id(index), ORDINARY[index])],
+        vec![space_resource(
+            &meta_space_resource_id(index),
+            ORDINARY[index],
+        )],
     );
     holder.resources.into_iter().next().unwrap()
 }
 
-/// The Space Resource through which stored Space `from` links ordinary
+/// The Space Resource through which stored Space `from` refers to ordinary
 /// Space `to`: its id names both.
-fn link_from(from: SpaceId, to: usize) -> Resource {
+fn space_resource_from(from: SpaceId, to: usize) -> Resource {
     let from = position(from.as_str()).map_or(0, |at| at + 1);
     let id = format!("c2000000-0000-4000-8000-0000000005{from:x}{to:x}");
     let holder = space_holding(SPACE_ID, "Holder", vec![space_resource(&id, ORDINARY[to])]);
@@ -136,7 +142,7 @@ fn link_from(from: SpaceId, to: usize) -> Resource {
 }
 
 /// Whether `resource` is a Space Resource showing `space`.
-fn links_to(resource: &Resource, space: SpaceId) -> bool {
+fn refers_to(resource: &Resource, space: SpaceId) -> bool {
     resource.kind.as_str() == "space"
         && resource
             .content
@@ -221,22 +227,22 @@ pub enum Step {
         index: usize,
         receiver_first: bool,
     },
-    /// Create an ordinary Space, linked from Meta or not; one the store
+    /// Create an ordinary Space, referred to from Meta or not; one the store
     /// already holds among them.
     Create {
         space: usize,
-        linked: bool,
+        from_meta: bool,
         meta_first: bool,
     },
-    /// Link an ordinary Space, stored or not, from a stored Space through a
-    /// Space Resource of its own.
-    Link { from: usize, to: usize },
+    /// Add to a stored Space a Space Resource referring to an ordinary
+    /// Space, stored or not.
+    Refer { from: usize, to: usize },
     /// Delete a stored Space, Meta among them, and update every other stored
-    /// Space linking it as `unlinking` says, those updates listed before the
-    /// delete or after it.
+    /// Space referring to it as `referrers` says, those updates listed before
+    /// the delete or after it.
     Delete {
         space: usize,
-        unlinking: Unlinking,
+        referrers: Referrers,
         updates_first: bool,
         revision: Expected,
     },
@@ -252,18 +258,25 @@ pub enum Step {
     Twice { space: usize, delete_first: bool },
     /// Update a stored Space with another stored Space's snapshot.
     Mismatched { space: usize, other: usize },
+    /// Record an Export of a stored Space at the revision `revision` names
+    /// against what is stored (`mark_exported`), which a later commit
+    /// rewriting the Space's row must keep.
+    MarkExported { space: usize, revision: Expected },
 }
 
-/// What a deletion does to the other stored Spaces linking the Space it
-/// deletes: the TypeScript differential's "partial-deletion",
+/// What a deletion does to the other stored Spaces referring to the Space
+/// it deletes: the TypeScript differential's "partial-deletion",
 /// "incomplete-deletion-proposal" and "complete-deletion".
 #[derive(Debug, Clone, Copy)]
-pub enum Unlinking {
+pub enum Referrers {
     /// Leaves them alone.
     Untouched,
-    /// Retitles each, keeping its links.
+    /// Retitles each, keeping its Space Resources referring to it.
     Retitled,
-    /// Drops each one's links to it.
+    /// Retitles the first, keeping its Space Resources referring to it, and
+    /// drops every other one's, as "incomplete-deletion-proposal" does.
+    FirstKept,
+    /// Drops each one's Space Resources referring to it.
     Dropped,
 }
 
@@ -344,7 +357,8 @@ impl Fixed {
     }
 }
 
-/// The TypeScript differential's scenarios that need no link or ceiling, in
+/// The TypeScript differential's scenarios that need no Space Resource
+/// added, no deletion and no ceiling, in
 /// one sequence from the initial aggregate: "topology-preserving-update",
 /// "update-conflict", "map-internal-update", "graph-added",
 /// "selected-graph-replaced", "create-ordinary-space", "create-conflict",
@@ -362,7 +376,7 @@ pub fn scenario_steps() -> Fixed {
             (
                 Step::Create {
                     space: 2,
-                    linked: true,
+                    from_meta: true,
                     meta_first: false,
                 },
                 "committed",
@@ -370,7 +384,7 @@ pub fn scenario_steps() -> Fixed {
             (
                 Step::Create {
                     space: 0,
-                    linked: false,
+                    from_meta: false,
                     meta_first: false,
                 },
                 "conflict",
@@ -379,7 +393,7 @@ pub fn scenario_steps() -> Fixed {
             (
                 Step::Delete {
                     space: 3,
-                    unlinking: Unlinking::Dropped,
+                    referrers: Referrers::Dropped,
                     updates_first: false,
                     revision: Expected::Behind,
                 },
@@ -434,27 +448,176 @@ pub fn map_internal_and_ceiling_steps() -> Fixed {
     }
 }
 
-/// The TypeScript differential's deletion scenarios: an ordinary Space
-/// links another; deleting a Space two Spaces link, alone, is a conflict
-/// ("partial-deletion"); deleting it while each Space linking it changes but
-/// keeps its link is refused ("incomplete-deletion-proposal"); deleting it
-/// while each drops its link, Meta and an ordinary Space both, commits
-/// ("complete-deletion"); and a link to a Space no longer stored is refused.
-pub fn linking_and_deletion_steps() -> Fixed {
-    let delete = |unlinking| Step::Delete {
+/// An ordinary Space given a Space Resource referring to another; deleting
+/// a Space Meta and an ordinary Space refer to, alone, is a conflict;
+/// deleting it while each Space referring to it changes but keeps its Space
+/// Resource is refused; deleting it while each drops its Space Resource,
+/// Meta and an ordinary Space both, commits; and a Space Resource referring
+/// to a Space no longer stored is refused.
+pub fn reference_and_deletion_steps() -> Fixed {
+    let delete = |referrers| Step::Delete {
         space: 1,
-        unlinking,
+        referrers,
         updates_first: true,
         revision: Expected::Current,
     };
     Fixed {
         start: [Start::First, Start::First, Start::First],
         steps: vec![
-            (Step::Link { from: 2, to: 0 }, "committed"),
-            (delete(Unlinking::Untouched), "conflict"),
-            (delete(Unlinking::Retitled), "aggregate-refused"),
-            (delete(Unlinking::Dropped), "committed"),
-            (Step::Link { from: 0, to: 0 }, "aggregate-refused"),
+            (Step::Refer { from: 2, to: 0 }, "committed"),
+            (delete(Referrers::Untouched), "conflict"),
+            (delete(Referrers::Retitled), "aggregate-refused"),
+            (delete(Referrers::Dropped), "committed"),
+            (Step::Refer { from: 0, to: 0 }, "aggregate-refused"),
+        ],
+    }
+}
+
+/// The TypeScript differential's deletion scenarios, each on a Space that
+/// three ordinary Spaces refer to and Meta does not, as that test's parents
+/// refer to its shared Space. Two Spaces are created from Meta; each of the
+/// three ordinary Spaces then stored is given a Space Resource referring to
+/// the last, the third and the last each a Note, and the last is dropped
+/// from Meta. Deleting the last
+/// alone is a conflict ("partial-deletion"); deleting it while the first
+/// Space referring to it is retitled, keeping its Space Resource, and the
+/// other two drop theirs, four changes with the delete last, is refused
+/// ("incomplete-deletion-proposal"); its Note is dropped; and deleting it
+/// while all three drop theirs, four changes with the delete first, commits
+/// ("complete-deletion").
+pub fn deletion_from_several_parents_steps() -> Fixed {
+    let delete = |referrers, updates_first| Step::Delete {
+        space: 4,
+        referrers,
+        updates_first,
+        revision: Expected::Current,
+    };
+    let current = Expected::Current;
+    Fixed {
+        start: [Start::First, Start::First, Start::First],
+        steps: vec![
+            (
+                Step::Create {
+                    space: 2,
+                    from_meta: true,
+                    meta_first: false,
+                },
+                "committed",
+            ),
+            (
+                Step::Create {
+                    space: 3,
+                    from_meta: true,
+                    meta_first: true,
+                },
+                "committed",
+            ),
+            (Step::Refer { from: 1, to: 3 }, "committed"),
+            (Step::Refer { from: 2, to: 3 }, "committed"),
+            (Step::Refer { from: 3, to: 3 }, "committed"),
+            (
+                Step::Add {
+                    space: 3,
+                    note: 4,
+                    of_no_plugin: false,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (
+                Step::Add {
+                    space: 4,
+                    note: 5,
+                    of_no_plugin: false,
+                    revision: current,
+                },
+                "committed",
+            ),
+            // Meta holds a Note and a Space Resource for each of the four
+            // ordinary Spaces, ascending by id, so the fifth refers to the
+            // Space to be deleted.
+            (
+                Step::Drop {
+                    space: 0,
+                    index: 4,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (delete(Referrers::Untouched, false), "conflict"),
+            (delete(Referrers::FirstKept, false), "aggregate-refused"),
+            // No answer carries the Space once its Note is dropped, so only
+            // what each store holds after this step shows a Note row left
+            // behind, which the delete then removes.
+            (
+                Step::Drop {
+                    space: 4,
+                    index: 0,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (delete(Referrers::Dropped, true), "committed"),
+        ],
+    }
+}
+
+/// An Export recorded for a Space, the Space then committed to twice, so
+/// its row is rewritten keeping the exported revision; an Export recorded
+/// behind another Space's revision, near the ceiling, and that Space
+/// rearranged; the first Space deleted; and an Export recorded for Meta.
+pub fn export_steps() -> Fixed {
+    let current = Expected::Current;
+    Fixed {
+        start: [Start::First, Start::First, Start::BelowCeiling(2)],
+        steps: vec![
+            (
+                Step::MarkExported {
+                    space: 1,
+                    revision: current,
+                },
+                "exported",
+            ),
+            (
+                Step::Retitle {
+                    space: 1,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (
+                Step::Add {
+                    space: 1,
+                    note: 6,
+                    of_no_plugin: true,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (
+                Step::MarkExported {
+                    space: 2,
+                    revision: Expected::Behind,
+                },
+                "exported",
+            ),
+            (Step::Arrange { space: 2, x: 3 }, "committed"),
+            (
+                Step::Delete {
+                    space: 1,
+                    referrers: Referrers::Dropped,
+                    updates_first: false,
+                    revision: current,
+                },
+                "committed",
+            ),
+            (
+                Step::MarkExported {
+                    space: 0,
+                    revision: current,
+                },
+                "exported",
+            ),
         ],
     }
 }
@@ -467,11 +630,12 @@ fn expected() -> impl Strategy<Value = Expected> {
     ]
 }
 
-fn unlinking() -> impl Strategy<Value = Unlinking> {
+fn referrers() -> impl Strategy<Value = Referrers> {
     prop_oneof![
-        Just(Unlinking::Untouched),
-        Just(Unlinking::Retitled),
-        Just(Unlinking::Dropped),
+        Just(Referrers::Untouched),
+        Just(Referrers::Retitled),
+        Just(Referrers::FirstKept),
+        Just(Referrers::Dropped),
     ]
 }
 
@@ -506,18 +670,18 @@ fn step() -> impl Strategy<Value = Step> {
                 receiver_first
             }
         ),
-        (0_usize..4, any::<bool>(), any::<bool>()).prop_map(|(space, linked, meta_first)| {
+        (0_usize..4, any::<bool>(), any::<bool>()).prop_map(|(space, from_meta, meta_first)| {
             Step::Create {
                 space,
-                linked,
+                from_meta,
                 meta_first,
             }
         }),
-        (0_usize..8, 0_usize..4).prop_map(|(from, to)| Step::Link { from, to }),
-        (0_usize..8, unlinking(), any::<bool>(), expected()).prop_map(
-            |(space, unlinking, updates_first, revision)| Step::Delete {
+        (0_usize..8, 0_usize..4).prop_map(|(from, to)| Step::Refer { from, to }),
+        (0_usize..8, referrers(), any::<bool>(), expected()).prop_map(
+            |(space, referrers, updates_first, revision)| Step::Delete {
                 space,
-                unlinking,
+                referrers,
                 updates_first,
                 revision
             }
@@ -530,6 +694,8 @@ fn step() -> impl Strategy<Value = Step> {
             delete_first
         }),
         (0_usize..8, 1_usize..8).prop_map(|(space, other)| Step::Mismatched { space, other }),
+        (0_usize..8, expected())
+            .prop_map(|(space, revision)| Step::MarkExported { space, revision }),
     ]
 }
 
@@ -565,9 +731,33 @@ fn position(space: &str) -> Option<usize> {
     ORDINARY.iter().position(|ordinary| *ordinary == space)
 }
 
+/// What a step asks of both stores: a commit, or an Export recorded for a
+/// Space at a revision.
+#[derive(Debug, Clone)]
+pub enum Request {
+    Commit(SpaceCommit),
+    MarkExported(SpaceId, Revision),
+}
+
+/// What `step` asks of `stored`, the Spaces stored now (Meta first), each
+/// snapshot's Resources reordered by `order`; `None` where the step names
+/// nothing it can act on.
+pub fn request_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Request> {
+    match step {
+        Step::MarkExported { space, revision } => {
+            let space = &stored[space % stored.len()];
+            Some(Request::MarkExported(
+                space.snapshot.id,
+                revision.of(space.revision),
+            ))
+        }
+        _ => commit_for(step, stored, order).map(Request::Commit),
+    }
+}
+
 /// The commit `step` makes of `stored`, the Spaces stored now (Meta first),
 /// each snapshot's Resources reordered by `order`; `None` where the step
-/// names nothing it can act on.
+/// names nothing it can act on or makes no commit.
 #[allow(
     clippy::too_many_lines,
     reason = "one arm per step, each the commit its variant documents"
@@ -658,7 +848,7 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
         }
         Step::Create {
             space,
-            linked,
+            from_meta,
             meta_first,
         } => {
             let mut created = ordinary(*space, "Created", &[]);
@@ -667,39 +857,39 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                 space_id: created.id,
                 snapshot: created,
             };
-            if !*linked {
+            if !*from_meta {
                 return Some(SpaceCommit {
                     changes: vec![create],
                 });
             }
             let mut resources = meta.snapshot.resources.clone();
-            resources.push(link(*space));
+            resources.push(meta_space_resource(*space));
             in_order(
                 create,
                 update(with(meta, resources), meta.revision),
                 *meta_first,
             )
         }
-        Step::Link { from, to } => {
-            let linking = pick(*from);
-            let link = link_from(linking.snapshot.id, *to);
-            if linking
+        Step::Refer { from, to } => {
+            let referring = pick(*from);
+            let added = space_resource_from(referring.snapshot.id, *to);
+            if referring
                 .snapshot
                 .resources
                 .iter()
-                .any(|held| held.id == link.id)
+                .any(|held| held.id == added.id)
             {
                 return None;
             }
-            let mut resources = linking.snapshot.resources.clone();
-            resources.push(link);
+            let mut resources = referring.snapshot.resources.clone();
+            resources.push(added);
             SpaceCommit {
-                changes: vec![update(with(linking, resources), linking.revision)],
+                changes: vec![update(with(referring, resources), referring.revision)],
             }
         }
         Step::Delete {
             space,
-            unlinking,
+            referrers,
             updates_first,
             revision,
         } => {
@@ -710,27 +900,30 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
             };
             let updates: Vec<SpaceChange> = stored
                 .iter()
-                .filter(|_| !matches!(unlinking, Unlinking::Untouched))
+                .filter(|_| !matches!(referrers, Referrers::Untouched))
                 .filter(|held| held.snapshot.id != deleted.snapshot.id)
                 .filter(|held| {
                     held.snapshot
                         .resources
                         .iter()
-                        .any(|resource| links_to(resource, deleted.snapshot.id))
+                        .any(|resource| refers_to(resource, deleted.snapshot.id))
                 })
-                .map(|held| {
+                .enumerate()
+                .map(|(at, held)| {
+                    let kept = match referrers {
+                        Referrers::Retitled => true,
+                        Referrers::FirstKept => at == 0,
+                        Referrers::Untouched | Referrers::Dropped => false,
+                    };
                     let resources = held
                         .snapshot
                         .resources
                         .iter()
-                        .filter(|resource| {
-                            matches!(unlinking, Unlinking::Retitled)
-                                || !links_to(resource, deleted.snapshot.id)
-                        })
+                        .filter(|resource| kept || !refers_to(resource, deleted.snapshot.id))
                         .cloned()
                         .collect();
                     let mut next = with(held, resources);
-                    if matches!(unlinking, Unlinking::Retitled) {
+                    if kept {
                         next.document.title.push('~');
                     }
                     update(next, held.revision)
@@ -826,6 +1019,7 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                 *delete_first,
             )
         }
+        Step::MarkExported { .. } => return None,
         Step::Mismatched { space, other } => {
             let (target, named) = (pick(*space), pick(space + other));
             if target.snapshot.id == named.snapshot.id {
@@ -896,8 +1090,8 @@ pub fn initial() -> Vec<SpaceSnapshot> {
         "Meta",
         vec![
             resource(&note_id(0), "Note"),
-            space_resource(&link_resource_id(0), ORDINARY[0]),
-            space_resource(&link_resource_id(1), ORDINARY[1]),
+            space_resource(&meta_space_resource_id(0), ORDINARY[0]),
+            space_resource(&meta_space_resource_id(1), ORDINARY[1]),
         ],
     );
     let mut spaces = vec![
@@ -942,6 +1136,7 @@ pub fn memory_at(start: &[Start; 3]) -> MemorySpaceRepository {
             })
             .collect(),
     })
+    .unwrap()
 }
 
 /// What kind of answer a commit made, by name.
@@ -958,9 +1153,12 @@ pub fn kind_of(answer: &Result<CommitResult, RepositoryError>) -> &'static str {
 }
 
 /// Run `steps` on `memory` and on `durable`, named `name`, each stored the
-/// same initial aggregate at the same revisions: each step's commit is made
-/// of what the memory store holds, and both stores answer it the same,
-/// compared as `keys` says, each answer's Spaces asserted ascending first.
+/// same initial aggregate at the same revisions: each step's request is made
+/// of what the memory store holds, both stores answer it the same, and both
+/// then hold the same aggregate, compared as `keys` says, each answer's and
+/// each stored Space's Resources asserted ascending first. Comparing what
+/// each holds after every step, not only at the end, catches a row a step
+/// wrongly left or wrote at that step, though a later step would hide it.
 /// Answers the kind of each answer made.
 pub async fn compare_steps<R: SpaceRepository>(
     memory: &MemorySpaceRepository,
@@ -973,21 +1171,61 @@ pub async fn compare_steps<R: SpaceRepository>(
     for (step, order) in steps {
         let loaded = memory.load_aggregate().await.unwrap();
         let stored = stored_spaces("the memory store", &loaded);
-        let Some(request) = commit_for(step, &stored, *order) else {
+        let Some(request) = request_for(step, &stored, *order) else {
             continue;
         };
-        let from_memory = memory.commit(request.clone()).await;
-        let from_durable = durable.commit(request.clone()).await;
-        assert_ascending_answer("the memory store", &from_memory);
-        assert_ascending_answer(name, &from_durable);
-        assert_eq!(
-            keys.compared(&from_durable),
-            keys.compared(&from_memory),
-            "{name}: {step:?} answers {request:?}"
-        );
-        kinds.push(kind_of(&from_memory));
+        let kind = match &request {
+            Request::Commit(commit) => {
+                let from_memory = memory.commit(commit.clone()).await;
+                let from_durable = durable.commit(commit.clone()).await;
+                assert_ascending_answer("the memory store", &from_memory);
+                assert_ascending_answer(name, &from_durable);
+                assert_eq!(
+                    keys.compared(&from_durable),
+                    keys.compared(&from_memory),
+                    "{name}: {step:?} answers {request:?}"
+                );
+                kind_of(&from_memory)
+            }
+            Request::MarkExported(space, revision) => {
+                let from_memory = memory.mark_exported(*space, *revision).await;
+                let from_durable = durable.mark_exported(*space, *revision).await;
+                assert_eq!(
+                    from_durable, from_memory,
+                    "{name}: {step:?} answers {request:?}"
+                );
+                if from_memory.is_ok() {
+                    "exported"
+                } else {
+                    "failure"
+                }
+            }
+        };
+        assert_same_held(memory, durable, name, keys, &format!("after {step:?}")).await;
+        kinds.push(kind);
     }
     kinds
+}
+
+/// Assert that `durable`, named `name`, holds the aggregate `memory` holds,
+/// exported revisions among it, compared as `keys` says, each Space's
+/// Resources ascending on each; `when` says at which point.
+async fn assert_same_held<R: SpaceRepository>(
+    memory: &MemorySpaceRepository,
+    durable: &R,
+    name: &str,
+    keys: KeyOrder,
+    when: &str,
+) {
+    let held = memory.load_aggregate().await.unwrap();
+    stored_spaces("the memory store", &held);
+    let read = durable.load_aggregate().await.unwrap();
+    stored_spaces(name, &read);
+    assert_eq!(
+        keys.compared(&read),
+        keys.compared(&held),
+        "the aggregate the memory store and {name} hold {when}"
+    );
 }
 
 /// Assert that `reopened`, a fresh repository over what a durable store
@@ -999,13 +1237,5 @@ pub async fn compare_final<R: SpaceRepository>(
     name: &str,
     keys: KeyOrder,
 ) {
-    let held = memory.load_aggregate().await.unwrap();
-    stored_spaces("the memory store", &held);
-    let read = reopened.load_aggregate().await.unwrap();
-    stored_spaces(name, &read);
-    assert_eq!(
-        keys.compared(&read),
-        keys.compared(&held),
-        "the aggregate the memory store and {name} hold at the end"
-    );
+    assert_same_held(memory, reopened, name, keys, "at the end").await;
 }

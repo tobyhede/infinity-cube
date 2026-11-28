@@ -1,8 +1,14 @@
 //! Generated commit sequences on the memory store and on a PostgreSQL
 //! database (rust-postgresql-store 11), the port of the TypeScript
 //! differential `aggregate-commit-differential.test.ts`: every step answers
-//! the same on both, and both hold the same aggregate at the end, the
-//! database read again through a new pool. The sequences are
+//! the same on both, both hold the same aggregate after every step, exported
+//! revisions among it, and both hold it at the end, the database read again
+//! through a new pool. Its scenarios are ported as fixed sequences, each
+//! asserting the answer it exists to reach: those needing no deletion and
+//! no ceiling in `scenario_steps`, "partial-deletion",
+//! "incomplete-deletion-proposal" and "complete-deletion" in
+//! `deletion_from_several_parents_steps`, on a Space three ordinary Spaces
+//! refer to, as the TypeScript parents refer to its shared Space. The sequences are
 //! `commit_sequences`', the ones `tests/store_properties.rs` runs on SQLite.
 //!
 //! **Which side normalises what.** PostgreSQL's `jsonb` stores an object's
@@ -43,7 +49,7 @@ mod postgres_support;
 mod repository_contract;
 
 use commit_sequences::{
-    Case, Expected, Fixed, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
+    Case, Expected, Fixed, KeyOrder, Referrers, Start, Step, compare_final, compare_steps, initial,
     memory_at, revision_statement, start_revisions,
 };
 use host::PostgresSpaceRepository;
@@ -56,6 +62,13 @@ use repository_contract::seed;
 /// template and runs up to eleven commits, so this bounds the `rust` job's
 /// PostgreSQL step.
 const CASES: u32 = 64;
+
+/// How many shrinking iterations a failing case may run before proptest
+/// reports the smallest case found so far. Each iteration runs a whole case
+/// on a database cloned for it, as a generated case does, so this bounds
+/// shrinking at twice the cost of the generated cases. Left unset, proptest
+/// takes four times `CASES` and sets no time limit.
+const MAX_SHRINK_ITERS: u32 = 128;
 
 /// A database holding the initial aggregate at the revisions `start` puts
 /// it at, and a repository over it.
@@ -97,7 +110,10 @@ async fn run(case: Case) -> Vec<&'static str> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(CASES))]
+    #![proptest_config(ProptestConfig {
+        max_shrink_iters: MAX_SHRINK_ITERS,
+        ..ProptestConfig::with_cases(CASES)
+    })]
 
     // Case: gives memory and PostgreSQL the same public outcome over generated aggregate changes
     #[test]
@@ -114,8 +130,9 @@ proptest! {
     }
 }
 
-/// Run `fixed` on the memory store and on PostgreSQL, comparing every answer
-/// and the final aggregate, and assert that each step made the answer it
+/// Run `fixed` on the memory store and on PostgreSQL, comparing every answer,
+/// the aggregate each holds after every step and the final aggregate, and
+/// assert that each step made the answer it
 /// exists to reach: a step that made no commit, or a different answer on
 /// both, fails here rather than passing as agreement.
 async fn assert_reaches(fixed: Fixed, sequence: &str) {
@@ -179,7 +196,7 @@ async fn answers_every_kind_of_answer_as_the_memory_store_does() {
         (
             Step::Create {
                 space: 2,
-                linked: true,
+                from_meta: true,
                 meta_first: false,
             },
             "committed",
@@ -195,7 +212,7 @@ async fn answers_every_kind_of_answer_as_the_memory_store_does() {
         (
             Step::Delete {
                 space: 2,
-                unlinking: Unlinking::Dropped,
+                referrers: Referrers::Dropped,
                 updates_first: true,
                 revision: Expected::Current,
             },
@@ -212,9 +229,9 @@ async fn answers_every_kind_of_answer_as_the_memory_store_does() {
     .await;
 }
 
-/// The TypeScript differential's scenarios that need no link or ceiling,
-/// each compared on PostgreSQL on every run, as that test's fixed
-/// `examples` are.
+/// The TypeScript differential's scenarios that need no Space Resource
+/// added, no deletion and no ceiling, each compared on PostgreSQL on every
+/// run, as that test's fixed `examples` are.
 #[tokio::test]
 #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
 async fn answers_each_differential_scenario_as_the_memory_store_does() {
@@ -233,14 +250,36 @@ async fn answers_the_map_internal_and_ceiling_steps_as_the_memory_store_does() {
     .await;
 }
 
-/// Linking a Space, and deleting a linked Space with its links untouched,
-/// retitled or dropped.
+/// Giving an ordinary Space a Space Resource referring to another, and
+/// deleting a Space Meta and an ordinary Space refer to with the Spaces
+/// referring to it untouched, retitled or dropping their Space Resources.
 #[tokio::test]
 #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
-async fn answers_the_linking_and_deletion_steps_as_the_memory_store_does() {
+async fn answers_the_reference_and_deletion_steps_as_the_memory_store_does() {
     assert_reaches(
-        commit_sequences::linking_and_deletion_steps(),
-        "the linking and deletion steps",
+        commit_sequences::reference_and_deletion_steps(),
+        "the reference and deletion steps",
     )
     .await;
+}
+
+/// The TypeScript differential's "partial-deletion",
+/// "incomplete-deletion-proposal" and "complete-deletion", on a Space three
+/// ordinary Spaces refer to, each compared on PostgreSQL on every run.
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn answers_the_deletion_scenarios_as_the_memory_store_does() {
+    assert_reaches(
+        commit_sequences::deletion_from_several_parents_steps(),
+        "the deletion scenarios",
+    )
+    .await;
+}
+
+/// An Export recorded for a Space is kept as later commits rewrite its row,
+/// on memory and PostgreSQL alike.
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn keeps_each_exported_revision_as_the_memory_store_does() {
+    assert_reaches(commit_sequences::export_steps(), "the export steps").await;
 }
