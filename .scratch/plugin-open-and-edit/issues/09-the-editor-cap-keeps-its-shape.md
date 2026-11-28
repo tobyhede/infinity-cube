@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**What to build:** Ticket 05 caps the drawn editor at the visible canvas "as `visible-canvas-cap.ts` caps a hint today". `capSizeHint` keeps a narrowed hint's area, but the editor cap clamps each axis on its own, so a capped editor changes shape. Decide which rule the editor cap follows, then make the code and its test match ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)).
+**What to build:** Ticket 05 caps the drawn editor at the visible canvas "as `visible-canvas-cap.ts` caps a hint today". `capSizeHint` keeps a narrowed hint's area, but the editor cap clamps each axis on its own, so a capped editor changes shape. The cap also floors each axis at the Closed Size, which ADR 0178 does not state; the floor is held by `visible-canvas-cap.test.ts` › "caps no axis below the Closed Size, however small the visible canvas". Decide which rule the editor cap follows, including whether the floor stays, then make the code and its test match ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)).
 
 Raised in review on PR #547 (`packages/app/src/render-adapter.ts`).
 
@@ -12,3 +12,4 @@ Raised in review on PR #547 (`packages/app/src/render-adapter.ts`).
 
 - [ ] The editor cap and `capSizeHint` follow one stated rule, or the ticket records why they differ.
 - [ ] A unit test holds the rule for an editor wider than the visible canvas and for one taller than it.
+- [ ] The Closed Size floor is either recorded in an ADR or removed, with its test changed to match.
