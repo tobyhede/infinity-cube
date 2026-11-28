@@ -604,6 +604,62 @@ test('a new edit measures the saved source and keeps that size while typing', as
   await expect.poll(async () => (await editorRect(resource)).height).toBeGreaterThan(short.height);
 });
 
+/**
+ * Edit on a Closed Resource begins editing without Opening it (ADR 0178): the
+ * Save commits the text and nothing else, and the Resource is drawn Closed at
+ * its canvas size again. Editing is not stored, so a reload during an edit
+ * draws the Resource as stored, Closed (ADR 0042).
+ */
+test('Edit on a Closed Resource saves its text and leaves it Closed, and a reload ends the edit', async ({
+  page,
+}) => {
+  await seedGeometry(page, 'Edit From Closed Geometry', {
+    [SUBJECT.id]: { x: 0, y: 0 },
+    [NEIGHBOUR.id]: { x: 900, y: 0 },
+  });
+  const resource = seededNode(page, SUBJECT);
+  const source = page.getByRole('textbox', { name: 'Markdown source of A' });
+  const drawnOpen = resource.locator('.canvas-resource__plugin [data-open="true"]');
+  const rect = async () =>
+    resource.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
+  await expect(drawnOpen).toHaveCount(0);
+  expect(await rect()).toEqual(COLLAPSED_RESOURCE_SIZE);
+  const revision = await persistedRevision(page);
+
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+  await expect(source).toBeVisible();
+  await expect(
+    (await controls(resource)).getByRole('button', { name: 'Open Resource A' }),
+  ).toBeDisabled();
+  await source.fill('# Edited from Closed\n\nSaved without Opening');
+  await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
+  await expect(source).toHaveCount(0);
+  await persistedAt(page, revision + 1);
+  await expect(drawnOpen).toHaveCount(0);
+  await expect.poll(rect).toEqual(COLLAPSED_RESOURCE_SIZE);
+  await expect(
+    (await controls(resource)).getByRole('button', { name: 'Open Resource A' }),
+  ).toBeEnabled();
+
+  // A reload during an edit draws the Resource as stored: Closed, at its size.
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+  await expect(source).toContainText('Saved without Opening');
+  await page.reload();
+  await expect(selectedCanvas(page)).toContainText('Edit From Closed Geometry');
+  await settled(page);
+  await expect(source).toHaveCount(0);
+  await expect(drawnOpen).toHaveCount(0);
+  expect(await rect()).toEqual(COLLAPSED_RESOURCE_SIZE);
+  expect(await persistedRevision(page)).toBe(revision + 1);
+
+  // The saved text is the Resource's: Opening it draws it.
+  await openResourcePersisted(resource, SUBJECT.title);
+  await expect(resource).toContainText('Saved without Opening');
+});
+
 test('An edit draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps', async ({
   page,
 }) => {

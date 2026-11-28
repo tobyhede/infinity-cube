@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { z } from 'zod';
 import { Check, Pencil, StickyNote, X } from 'lucide-react';
 import {
@@ -6,6 +14,7 @@ import {
   lineFeedText,
   titleName,
   type AssetRef,
+  type ResourceId,
   type Size,
 } from '@project/resource-api/domain';
 import {
@@ -44,16 +53,15 @@ import {
 /** The inset the text is drawn at inside the rect. */
 const INSET = 12;
 
-const BUSY = 'Another change is still being made. Try again when it ends.';
-
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
 
 /** The text of the asset at a URL, as far as it has been read. */
-type Text =
-  | { readonly state: 'reading' }
+type TextAnswer =
   | { readonly state: 'read'; readonly text: string }
   | { readonly state: 'refused'; readonly refused: string };
+
+type Text = TextAnswer | { readonly state: 'reading' };
 
 const READING: Text = { state: 'reading' };
 
@@ -63,15 +71,24 @@ const UNREAD = 'Reading it failed.';
 /** What the status says where a Save failed rather than being refused. */
 const UNSAVED = 'The text could not be saved. Your draft is kept; Save again to retry.';
 
-/** What the status says where Edit was pressed while Closed and the text it Opened to cannot be read. */
+/** The refusal when Edit cannot read the source of a Closed Resource. */
 const UNEDITABLE = 'This text cannot be read, so it cannot be edited.';
 
-/**
- * Read the text an asset holds, once per URL, starting from text this view
- * already knows. Nothing is read until the text is `wanted`: a Closed
- * Resource draws none of it.
- */
-function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolean): Text {
+const BUSY = 'Another change is still being made. Try again when it ends.';
+
+/** Read source for display while Open or for editing while Closed, reusing known text. */
+function useText(
+  url: AssetRef,
+  assets: Assets,
+  known: KnownText,
+  open: boolean,
+  answerEdit?: (answer: TextAnswer) => void,
+): Text {
+  const wanted = open || answerEdit !== undefined;
+  const currentEdit = useRef(answerEdit);
+  useLayoutEffect(() => {
+    currentEdit.current = answerEdit;
+  }, [answerEdit]);
   const [read, setRead] = useState<{ readonly url: string; readonly text: Text }>(() => ({
     url,
     text: READING,
@@ -80,26 +97,22 @@ function useText(url: AssetRef, assets: Assets, known: KnownText, wanted: boolea
   // A refusal answers the read that was wanted: once the text is not wanted,
   // the next time it is reads again rather than answering with that refusal.
   if (!wanted && read.text.state === 'refused') setRead({ url, text: READING });
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!wanted || known.text(url) !== undefined) return undefined;
     let live = true;
-    const stillLive = (): boolean => live;
+    const finish = (text: TextAnswer): void => {
+      if (!live) return;
+      if (text.state === 'read') known.remember(url, text.text);
+      setRead({ url, text });
+      currentEdit.current?.(text);
+    };
     void readAsset(url)
-      .then(async (answer) => {
-        if (!stillLive()) return;
-        if (answer instanceof Blob) {
-          const text = await textOf(answer);
-          known.remember(url, text);
-          if (stillLive()) setRead({ url, text: { state: 'read', text } });
-        } else {
-          setRead({ url, text: { state: 'refused', refused: answer.refused } });
-        }
-      })
-      // A read that fails outright, as a network failure or a timeout does,
-      // is refused like any other: the text is drawn as a note, never awaited.
-      .catch(() => {
-        if (stillLive()) setRead({ url, text: { state: 'refused', refused: UNREAD } });
-      });
+      .then(async (answer): Promise<TextAnswer> =>
+        answer instanceof Blob
+          ? { state: 'read', text: await textOf(answer) }
+          : { state: 'refused', refused: answer.refused },
+      )
+      .then(finish, () => finish({ state: 'refused', refused: UNREAD }));
     return () => {
       live = false;
     };
@@ -191,7 +204,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  const text = useText(url, surface.assets, known, open);
+  const [editRead, setEditRead] = useState<{
+    readonly resourceId: ResourceId;
+    readonly url: AssetRef;
+  } | null>(null);
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -204,25 +220,44 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const claim = editing?.claim;
   useEffect(() => () => claim?.release(), [claim]);
 
-  const readable = text.state === 'read' ? text.text : null;
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
-  const mayEdit = open && readable !== null && mayAuthor;
-  // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
-  // what it Opens to is read only once it is Open, so the text decides then.
-  const mayEditClosed = !open && mayAuthor && mapCommit !== undefined;
-  const editWhenOpen = useRef(false);
+  const startEdit = useCallback(
+    (source: string) => {
+      if (!mayAuthor || editing !== null) return;
+      const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
+      if (surface.editSize !== undefined && held === undefined) {
+        setRefusal(BUSY);
+        return;
+      }
+      setRefusal(null);
+      // Compare with the editor’s LF line endings so an unchanged CRLF source stays untouched.
+      setEditing({ draft: source, base: lineFeedText(source), saving: false, claim: held });
+    },
+    [mayAuthor, editing, takeClaim, surface.editSize],
+  );
 
+  const answerEdit = useCallback(
+    (answer: TextAnswer) => {
+      setEditRead(null);
+      if (answer.state === 'refused') setRefusal(UNEDITABLE);
+      else startEdit(answer.text);
+    },
+    [startEdit],
+  );
+  const resourceId = surface.resource.id;
+  const readingForEdit = editRead?.url === url && editRead.resourceId === resourceId && mayAuthor;
+  if (editRead !== null && !readingForEdit) setEditRead(null);
+  const text = useText(url, surface.assets, known, open, readingForEdit ? answerEdit : undefined);
+  const readable = text.state === 'read' ? text.text : null;
+  const mayEdit = readable !== null && mayAuthor;
+  const mayEditClosed = !open && mayAuthor;
   const beginEdit = useCallback(() => {
-    if (!mayEdit || editing !== null) return;
-    const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
-    if (surface.editSize !== undefined && held === undefined) {
-      setRefusal(BUSY);
-      return;
+    if (readable !== null) startEdit(readable);
+    else {
+      setRefusal(null);
+      setEditRead({ resourceId, url });
     }
-    setRefusal(null);
-    // Compare with the editor’s LF line endings so an unchanged CRLF source stays untouched.
-    setEditing({ draft: readable, base: lineFeedText(readable), saving: false, claim: held });
-  }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
+  }, [readable, startEdit, resourceId, url]);
 
   const suggestEditorSize = (source: Size) => {
     const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
@@ -236,21 +271,6 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   };
 
   const end = useCallback(() => setEditing(null), []);
-
-  // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
-  if (editing !== null && !open) setEditing(null);
-
-  // An Edit asked for while Closed begins once the Open it caused has landed
-  // and the text is read, and where the text cannot be read says it cannot.
-  useEffect(() => {
-    if (text.state === 'refused' && editWhenOpen.current) {
-      editWhenOpen.current = false;
-      setRefusal(UNEDITABLE);
-    }
-    if (!editWhenOpen.current || !open || text.state !== 'read') return;
-    editWhenOpen.current = false;
-    beginEdit();
-  }, [open, text.state, beginEdit]);
 
   const save = useCallback(() => {
     if (editing?.claim === undefined || editing.saving) return;
@@ -294,19 +314,12 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const commitMap = useCallback(
     (next: MarkdownMapContent) => {
       if (mapCommit === undefined) return;
-      const committed = mapCommit(next);
-      // What an earlier gesture was refused is cleared by the next press, not
-      // by this answer, which may land after an Edit from Closed is answered.
-      void committed.then(
+      void mapCommit(next).then(
         (answer) => {
           const refused = refusalOf(answer);
-          if (refused === null) return;
-          setRefusal(refused);
-          editWhenOpen.current = false;
+          if (refused !== null) setRefusal(refused);
         },
-        () => {
-          editWhenOpen.current = false;
-        },
+        () => undefined,
       );
     },
     [mapCommit],
@@ -346,11 +359,10 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           disabled: editing.saving,
           keyshortcuts: 'Escape',
         },
-        // Closing mid-edit would take the draft's box away; the control keeps
-        // its place and says it is unavailable.
+        // Keep the current Open or Close control in its place while editing.
         ...(mapCommit === undefined
           ? []
-          : [{ ...openClose(false), run: () => undefined, disabled: true }]),
+          : [{ ...openClose(!open), run: () => undefined, disabled: true }]),
       ];
     }
     const edit: RailCommand[] =
@@ -361,13 +373,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
               id: 'edit',
               label: `Edit Resource ${name}`,
               icon: <Pencil size={14} />,
-              run: mayEdit
-                ? beginEdit
-                : () => {
-                    setRefusal(null);
-                    editWhenOpen.current = true;
-                    commitMap({ open: true });
-                  },
+              run: beginEdit,
             },
           ]
         : [];
@@ -405,6 +411,8 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     commitMap,
   ]);
 
+  const drawnOpen = open || editing !== null;
+
   // Like the disabled Cancel, Escape waits for a Save under way: a Save that
   // is refused leaves its draft up.
   const escape = (): void => {
@@ -416,7 +424,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       // Closed, the Title sits at the foot of the rect, as every Closed
       // Resource's does.
       style={
-        !open
+        !drawnOpen
           ? { ...fill, height: '100%', justifyContent: 'flex-end' }
           : editing !== null
             ? { ...fill, height: '100%' }
@@ -427,11 +435,14 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
     >
       <div
         ref={titleRow}
-        style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
+        style={{
+          padding: `${railBand}px ${INSET}px ${drawnOpen ? 0 : CLOSED_FOOT}px`,
+          minHeight: 0,
+        }}
       >
         <Title />
       </div>
-      {!open && (
+      {!drawnOpen && (
         // The kind glyph sits in the band along the top, at its right, as
         // every Closed Resource's does; an Open one draws none.
         <span
@@ -442,7 +453,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
           <MarkdownGlyph />
         </span>
       )}
-      {open && (
+      {drawnOpen && (
         <div
           style={{
             position: 'relative',

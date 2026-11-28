@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { PRIMARY_MODIFIER } from './markdown-source';
 import {
@@ -8,6 +9,22 @@ import {
   selectResource,
   settled,
 } from './graph';
+
+/**
+ * Save the source being edited in `resource` on Mod-Enter, then Open it to
+ * draw it: an edit begun from Closed leaves it Closed (ADR 0178).
+ */
+async function saveThenOpen(resource: Locator, title: string): Promise<void> {
+  const page = resource.page();
+  const source = page.getByRole('textbox', { name: `Mermaid source of ${title}` });
+  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(source).toHaveCount(0);
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: `Open Resource ${title}` })
+    .click();
+}
 
 /**
  * A Mermaid Resource drawn by the Mermaid library itself (ADR 0158), which no
@@ -26,7 +43,8 @@ test('a Mermaid Resource draws its saved source with Mermaid, in the canvas’s 
   await title.press('Enter');
 
   const flow = nodeByTitle(page, 'Flow').first();
-  // Edit from Closed Opens it and then begins editing (ADR 0064).
+  // Edit from Closed begins editing without Opening it (ADR 0178), so the
+  // diagram is drawn once the saved Resource is Opened.
   await (
     await resourceControls(page, flow)
   )
@@ -35,7 +53,7 @@ test('a Mermaid Resource draws its saved source with Mermaid, in the canvas’s 
   const source = page.getByRole('textbox', { name: 'Mermaid source of Flow' });
   await expect(source).toBeFocused();
   await source.fill('flowchart LR\n  Edit --> Save');
-  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await saveThenOpen(flow, 'Flow');
 
   const nodes = flow.locator('svg[aria-roledescription] .node');
   await expect(nodes).toHaveCount(2, { timeout: 20_000 });
@@ -79,7 +97,7 @@ test('a Mermaid source that chooses its own theme keeps it in either colour sche
   const source = page.getByRole('textbox', { name: 'Mermaid source of Themed' });
   await expect(source).toBeFocused();
   await source.fill('---\nconfig:\n  theme: forest\n---\nflowchart LR\n  A --> B');
-  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await saveThenOpen(themed, 'Themed');
 
   const nodes = themed.locator('svg[aria-roledescription] .node');
   await expect(nodes).toHaveCount(2, { timeout: 20_000 });
@@ -117,7 +135,7 @@ test('a Mermaid source that cannot be drawn is refused in Mermaid’s words, nam
   await expect(source).toBeFocused();
   // Three lines, the third of them the one Mermaid cannot read.
   await source.fill('flowchart LR\n  A --> B\n  B --> --> C');
-  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await saveThenOpen(broken, 'Broken');
 
   // The source is drawn as written, so the line Mermaid names is the author's.
   await expect(broken.getByRole('note')).toContainText('Parse error on line 3', {

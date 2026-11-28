@@ -6,7 +6,7 @@ Read this before choosing a package, crossing an import boundary, adding a Resou
 
 - `core` owns schemas and domain types. `graph` owns intake and pure operations on a Space. Neither owns React or transport. Follow the [graph index](../../packages/graph/src/index.ts) when changing its public surface. Name exports explicitly and test private helpers through their own modules.
 - A Resource plugin publishes `/domain` and `/view` from `src/domain.ts` and `src/view.tsx`. It reaches only `resource-api/domain` and `resource-api/view` among project packages. Keep React out of the domain entry. Hosts provide `resource-api/view/host`; plugin tests use `resource-api/view/testing`.
-- Markdown and Mermaid use the host’s source editor. Markdown also uses the host’s rendered text. Keep CodeMirror and Markdown parsing behind the host boundary. Each plugin chooses how to obtain the editor size it suggests.
+- Markdown and Mermaid can edit directly from Closed. They read the source for that edit and use the host’s source editor. Markdown also uses the host’s rendered text. Keep CodeMirror and Markdown parsing behind the host boundary. Each plugin chooses how to obtain the editor size it suggests.
 - `plugins` owns registration and choice order. Register a kind in its domain and view entries, and add the dependency to the `plugins` and `app` manifests. The default plugin handles unregistered kinds. See [Space and Resources](../requirements/space-and-resources.md) and [Build & Tooling](build-tooling.md) for plugin aliases and CSS side effects.
 
 ## Hosts and persistence
