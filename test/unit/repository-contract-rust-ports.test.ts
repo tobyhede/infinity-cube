@@ -295,7 +295,8 @@ const unrun = (
  * case's name, covering each of its values, or by one value, `<name> (<value>)`,
  * which then decides that value alone. It is one of four kinds: pending, naming
  * the ticket of the plan that ports it; does not apply, naming the reason the
- * plan's spec gives; owned elsewhere, naming the rust-host ticket that ports it;
+ * plan's spec gives; owned elsewhere, naming the ticket that ports it outside
+ * the Rust store's own tests, of rust-host or of this plan;
  * and accepted difference, naming the decision.
  *
  * The adapter's own files are where its ports are written, and a file the
@@ -331,7 +332,10 @@ const doesNotApplyOnPostgres = (reason: keyof typeof DOES_NOT_APPLY): PostgresEx
   reason: DOES_NOT_APPLY[reason],
 });
 
-/** A case a rust-host ticket ports, outside this plan. */
+/**
+ * A case a ticket ports outside the Rust store's own tests: a rust-host
+ * ticket, or one of this plan's whose port is not a Rust test.
+ */
 const ownedElsewhere = (ticket: string): PostgresExemption => ({
   kind: 'owned elsewhere',
   ticket,
@@ -341,6 +345,20 @@ const acceptedDifference = (decision: string): PostgresExemption => ({
   kind: 'accepted difference',
   decision,
 });
+
+/** Whether `exemption` carries its ticket, reason or decision. */
+const isExplained = (exemption: PostgresExemption): boolean => {
+  switch (exemption.kind) {
+    case 'pending':
+      return true;
+    case 'does not apply':
+      return Object.values<string>(DOES_NOT_APPLY).includes(exemption.reason);
+    case 'owned elsewhere':
+      return /^(?:rust-host|rust-postgresql-store) \d+/u.test(exemption.ticket);
+    case 'accepted difference':
+      return exemption.decision.trim().length > 0;
+  }
+};
 
 /** The same exemption for each of `names`. */
 const exemptEach = (
@@ -662,10 +680,6 @@ const POSTGRES_EXEMPT = {
     'Q5: a temporary resolver failure and a name that does not resolve reach Rust alike, as `Io(Uncategorized)` with no OS error, so Rust leaves both unclassified',
   ),
 
-  // test/integration/aggregate-commit-differential.test.ts
-  'gives memory and PostgreSQL the same public outcome over generated aggregate changes':
-    pending('11'),
-
   // test/unit/prisma-foundation.test.ts
   ...exemptEach(
     [
@@ -676,7 +690,9 @@ const POSTGRES_EXEMPT = {
   ),
 
   // test/e2e/postgres-persistence.spec.ts
-  'a PostgreSQL-backed edit survives a fresh host': pending('10'),
+  'a PostgreSQL-backed edit survives a fresh host': ownedElsewhere(
+    'rust-postgresql-store 10: test/e2e/postgres-persistence.spec.ts, which CI’s `postgres` job runs as `pnpm e2e:postgres` on the Vite host and on `infinity-cube serve --store postgres`',
+  ),
 
   // test/integration/infinity-cube-cli.test.ts and the PostgreSQL arm of
   // test/integration/database-cli-targets.test.ts
@@ -720,6 +736,7 @@ const POSTGRES: Port = {
     POSTGRES_HARNESS,
     'crates/host/tests/postgres_concurrency.rs',
     'crates/host/tests/postgres_outages.rs',
+    'crates/host/tests/postgres_properties.rs',
     'crates/host/tests/postgres_races.rs',
     'crates/host/tests/postgres_url.rs',
     'crates/host/src/sql/postgres/tests.rs',
@@ -909,27 +926,18 @@ describe('the Rust PostgreSQL repository', () => {
     expect(
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
-      ported: 177,
-      pending: 2,
+      ported: 178,
+      pending: 0,
       'does not apply': 0,
-      'owned elsewhere': 10,
+      'owned elsewhere': 11,
       'accepted difference': 4,
     });
   });
 
   it('gives each exemption its ticket, reason or decision', () => {
-    const unexplained = Object.entries(POSTGRES.exempt).filter(([, exemption]) => {
-      switch (exemption.kind) {
-        case 'pending':
-          return false;
-        case 'does not apply':
-          return !Object.values<string>(DOES_NOT_APPLY).includes(exemption.reason);
-        case 'owned elsewhere':
-          return !/^rust-host \d+/u.test(exemption.ticket);
-        case 'accepted difference':
-          return exemption.decision.trim().length === 0;
-      }
-    });
+    const unexplained = Object.entries(POSTGRES.exempt).filter(
+      ([, exemption]) => !isExplained(exemption),
+    );
     expect(unexplained).toEqual([]);
   });
 });
@@ -1330,6 +1338,13 @@ describe('the PostgreSQL port check', () => {
       'owned elsewhere': 1,
       'accepted difference': 1,
     });
+  });
+
+  it('takes an owned-elsewhere exemption naming a ticket of either tracker, and refuses one naming neither', () => {
+    expect(isExplained(ownedElsewhere('rust-host 16: migration history'))).toBe(true);
+    expect(isExplained(ownedElsewhere('rust-postgresql-store 10: the restart proof'))).toBe(true);
+    expect(isExplained(ownedElsewhere('ticket 10: the restart proof'))).toBe(false);
+    expect(isExplained(ownedElsewhere('rust-host: no number'))).toBe(false);
   });
 
   it('finds a binary running the repository table only on a line of its own', () => {

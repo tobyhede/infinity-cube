@@ -96,6 +96,8 @@ pub use http::{Application, MAX_COMMIT_BODY_BYTES};
 pub use import::{IdSource, ImportError, RandomIds, import_directory};
 pub use init::{InitError, Initialized, NEW_SPACE_TITLE, init_directory};
 pub use lock::LOCK_FILE_NAME;
+#[cfg(any(test, feature = "test-support"))]
+pub use memory::HoldingRefused;
 pub use memory::MemorySpaceRepository;
 pub use repository::{
     AggregateInput, AggregateLoad, AggregateRefusal, AssetStored, CommitRefusal, CommitResult,

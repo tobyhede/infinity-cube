@@ -112,5 +112,9 @@ scripts/.check-typescript-toolchain.link.ts
 /.stryker-tmp/
 /reports/
 
+# cargo-mutants' output (`.cargo/mutants.toml`), a local diagnostic as above.
+/mutants.out/
+/mutants.out.old/
+
 # Wrangler's local state (`wrangler dev`, `wrangler deploy --dry-run`).
 .wrangler/

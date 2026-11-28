@@ -61,6 +61,136 @@ mod given_an_empty_store {
     }
 }
 
+mod given_spaces_held_at_revisions_of_their_own {
+    use super::*;
+
+    const RESOURCES: [&str; 2] = [
+        "10000000-0000-4000-8000-000000000012",
+        "10000000-0000-4000-8000-000000000011",
+    ];
+
+    /// Meta holding two Resources, listed in descending id order.
+    fn meta_out_of_order() -> SpaceSnapshot {
+        let resources: Vec<String> = RESOURCES
+            .iter()
+            .map(|id| {
+                format!(
+                    r#"{{"id":"{id}","document":{{"title":"Note","kind":"markdown","content":{{"url":"/assets/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"}}}}}}"#
+                )
+            })
+            .collect();
+        let value = parse(&format!(
+            r#"{{"id":"{META}","document":{{"version":1,"title":"Meta"}},"resources":[{}]}}"#,
+            resources.join(",")
+        ))
+        .unwrap();
+        decode_space_snapshot(&value, SpaceId::parse(META).unwrap()).unwrap()
+    }
+
+    fn at_the_ceiling() -> MemorySpaceRepository {
+        MemorySpaceRepository::holding(LoadedAggregate {
+            meta_space_id: SpaceId::parse(META).unwrap(),
+            spaces: vec![LoadedSpace {
+                snapshot: meta_out_of_order(),
+                revision: Revision::new(Revision::CEILING).unwrap(),
+                exported_revision: Some(Revision::new(7).unwrap()),
+            }],
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn answers_each_space_at_the_revisions_it_was_given_its_resources_ascending() {
+        run(async {
+            let store = at_the_ceiling();
+            let AggregateLoad::Loaded(aggregate) = store.load_aggregate().await.unwrap() else {
+                panic!("expected a loaded aggregate");
+            };
+            let held = &aggregate.spaces[0];
+            assert_eq!(held.revision.get(), Revision::CEILING, "the revision given");
+            assert_eq!(
+                held.exported_revision,
+                Revision::new(7),
+                "the exported revision given"
+            );
+            let ids: Vec<String> = held
+                .snapshot
+                .resources
+                .iter()
+                .map(|resource| resource.id.as_str().to_owned())
+                .collect();
+            assert_eq!(ids, [RESOURCES[1], RESOURCES[0]], "ascending by id (ST-21)");
+            assert_eq!(
+                store.load_meta_space_id().await.unwrap(),
+                Some(SpaceId::parse(META).unwrap()),
+                "the Meta identity given"
+            );
+        });
+    }
+
+    #[test]
+    fn refuses_an_update_past_the_ceiling_as_any_store_does() {
+        run(async {
+            let store = at_the_ceiling();
+            let answer = store
+                .commit(SpaceCommit {
+                    changes: vec![crate::repository::SpaceChange::Update {
+                        space_id: SpaceId::parse(META).unwrap(),
+                        snapshot: meta("Renamed"),
+                        expected_revision: Revision::new(Revision::CEILING).unwrap(),
+                    }],
+                })
+                .await;
+            assert!(
+                matches!(answer, Err(RepositoryError::BrokenStoredState(_))),
+                "got {answer:?}"
+            );
+        });
+    }
+}
+
+mod given_spaces_a_store_cannot_hold {
+    use super::*;
+
+    const OTHER: &str = "10000000-0000-4000-8000-000000000002";
+
+    fn at_first(snapshot: SpaceSnapshot) -> LoadedSpace {
+        LoadedSpace {
+            snapshot,
+            revision: Revision::FIRST,
+            exported_revision: None,
+        }
+    }
+
+    #[test]
+    fn refuses_two_spaces_of_one_id() {
+        let held = MemorySpaceRepository::holding(LoadedAggregate {
+            meta_space_id: SpaceId::parse(META).unwrap(),
+            spaces: vec![at_first(meta("First")), at_first(meta("Second"))],
+        });
+        assert_eq!(
+            held.err(),
+            Some(HoldingRefused::DuplicateSpace(
+                SpaceId::parse(META).unwrap()
+            )),
+            "two Spaces of one id are refused, not collapsed into one"
+        );
+    }
+
+    #[test]
+    fn refuses_a_meta_id_naming_no_space_held() {
+        let held = MemorySpaceRepository::holding(LoadedAggregate {
+            meta_space_id: SpaceId::parse(OTHER).unwrap(),
+            spaces: vec![at_first(meta("Meta"))],
+        });
+        assert_eq!(
+            held.err(),
+            Some(HoldingRefused::MetaNotHeld(SpaceId::parse(OTHER).unwrap())),
+            "a Meta id naming no Space held is refused"
+        );
+    }
+}
+
 mod given_an_initialized_store {
     use super::*;
 

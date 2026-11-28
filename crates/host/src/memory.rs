@@ -57,6 +57,16 @@ fn in_id_order(mut snapshot: SpaceSnapshot) -> SpaceSnapshot {
     snapshot
 }
 
+/// Why [`MemorySpaceRepository::holding`] refused the Spaces it was given.
+#[cfg(any(test, feature = "test-support"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoldingRefused {
+    /// Two Spaces given share this id.
+    DuplicateSpace(SpaceId),
+    /// The Meta id given names no Space given.
+    MetaNotHeld(SpaceId),
+}
+
 /// The in-process [`SpaceRepository`].
 ///
 /// # Examples
@@ -79,6 +89,39 @@ impl MemorySpaceRepository {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A store holding `aggregate` as given, each Space at its own revision
+    /// and exported revision, as the TypeScript memory backend is built from
+    /// the Spaces it holds (`MemorySpaceBackend`). Its Resources are held in
+    /// ascending id order (Storage ST-21). It runs no intake: it is how a
+    /// test puts a Space at a revision no sequence of commits reaches, such
+    /// as the ceiling, so it is for tests alone.
+    ///
+    /// # Errors
+    ///
+    /// [`HoldingRefused`] where two Spaces share an id, or the Meta id names
+    /// no Space held.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn holding(aggregate: LoadedAggregate) -> Result<Self, HoldingRefused> {
+        let mut spaces = BTreeMap::new();
+        for mut space in aggregate.spaces {
+            space.snapshot = in_id_order(space.snapshot);
+            let id = space.snapshot.id;
+            if spaces.insert(id, space).is_some() {
+                return Err(HoldingRefused::DuplicateSpace(id));
+            }
+        }
+        if !spaces.contains_key(&aggregate.meta_space_id) {
+            return Err(HoldingRefused::MetaNotHeld(aggregate.meta_space_id));
+        }
+        Ok(Self {
+            state: Mutex::new(State {
+                spaces,
+                meta_space_id: Some(aggregate.meta_space_id),
+                assets: HashMap::new(),
+            }),
+        })
     }
 
     fn state(&self) -> MutexGuard<'_, State> {

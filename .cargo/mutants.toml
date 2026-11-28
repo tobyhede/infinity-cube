@@ -1,0 +1,40 @@
+# cargo-mutants 27.1.0's audit of the Rust PostgreSQL store (the SQL
+# repository, PostgreSQL's statements and the commit decision) against every
+# PostgreSQL test. A local diagnostic, never a CI check. How to run it, and
+# what the last run found, are in `.scratch/mutation-testing/rust-postgresql-store.md`.
+
+examine_globs = [
+  "crates/host/src/sql.rs",
+  "crates/host/src/sql/postgres.rs",
+  "crates/host/src/commit.rs",
+]
+
+test_tool = "nextest"
+
+# Build only the test binaries the audit runs: the library's unit tests, each
+# `postgres*` test file and the CLI's `serve_postgres`, which is built
+# through `--package=infinity-cube`.
+additional_cargo_args = [
+  "--locked",
+  "--package=infinity-cube",
+  "--lib",
+  "--test=postgres",
+  "--test=postgres_concurrency",
+  "--test=postgres_outages",
+  "--test=postgres_properties",
+  "--test=postgres_races",
+  "--test=postgres_rows",
+  "--test=postgres_url",
+  "--test=postgres_wire",
+  "--test=serve_postgres",
+]
+
+# Every PostgreSQL test, ignored or not, and the unit tests of the files the
+# audit mutates: `sql::tests` (the concurrency seam's), `sql::postgres` and
+# `commit`.
+additional_cargo_test_args = [
+  "--run-ignored=all",
+  "--test-threads=4",
+  "-E",
+  "binary(/^postgres/) | binary(=serve_postgres) | (package(host) & kind(lib) & (test(/^sql::(tests|postgres)::/) | test(/^commit::/)))",
+]

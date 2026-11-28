@@ -965,3 +965,320 @@ mod given_rows_out_of_id_order {
         );
     }
 }
+
+/// Rows a writer outside the commit decision changed inside the commit's own
+/// transaction, through a trigger: a write meeting one fails or is refused
+/// rather than landing over it, as on SQLite (Storage ST-4).
+mod given_a_row_changed_outside_the_decision {
+    use super::*;
+    use repository_contract::{
+        commit as commit_of, resource, retitled, seed, snapshot, space_holding, space_json,
+        space_resource, target_document, target_space, update as update_at,
+    };
+
+    const META: &str = "c0000000-0000-4000-8000-0000000000e1";
+    const CHILD: &str = "c0000000-0000-4000-8000-0000000000e2";
+    const LINK: &str = "c0000000-0000-4000-8000-0000000001e2";
+    const NOTE: &str = "c0000000-0000-4000-8000-0000000002e2";
+
+    fn meta(linking: bool) -> SpaceSnapshot {
+        let links = if linking {
+            vec![space_resource(LINK, CHILD)]
+        } else {
+            vec![]
+        };
+        space_holding(META, "Meta", links)
+    }
+
+    /// The child, holding the one Resource `note` describes.
+    fn child(note: serde_json::Value) -> SpaceSnapshot {
+        snapshot(
+            CHILD,
+            &space_json(CHILD, target_document("Child"), vec![note]),
+        )
+    }
+
+    /// Meta, updated at revision 0 to link the child, which is created.
+    fn linking_a_created(child: SpaceSnapshot) -> SpaceCommit {
+        commit_of(vec![
+            update_at(&meta(true), 0),
+            SpaceChange::Create {
+                space_id: space(CHILD),
+                snapshot: child,
+            },
+        ])
+    }
+
+    /// Have `statement` run after each `event` of `table`, inside whichever
+    /// transaction caused it.
+    async fn after(database: &Fresh, event: &str, table: &str, statement: &str) {
+        database
+            .execute(&format!(
+                "CREATE FUNCTION outside() RETURNS trigger LANGUAGE plpgsql AS $$ \
+                 BEGIN {statement}; RETURN NULL; END $$; \
+                 CREATE TRIGGER outside AFTER {event} ON {table} \
+                 FOR EACH STATEMENT EXECUTE FUNCTION outside();"
+            ))
+            .await;
+    }
+
+    async fn aggregate(store: &PostgresSpaceRepository) -> AggregateLoad {
+        store.load_aggregate().await.unwrap()
+    }
+
+    // Meta's row is written before the child's (ascending by id), and the
+    // trigger leaves a row holding the child's Resource, owned by Meta,
+    // before the child's Resource row is inserted.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn refuses_a_commit_creating_a_space_whose_resource_row_is_already_written() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        seed(&store, &[&meta(false)]).await;
+        let before = aggregate(&store).await;
+        after(
+            &database,
+            "UPDATE",
+            "spaces",
+            &format!(
+                "INSERT INTO resources (id, space_id, document, updated_at) \
+                 VALUES ('{NOTE}', '{META}', '{{}}', now()) ON CONFLICT DO NOTHING"
+            ),
+        )
+        .await;
+        let answer = store
+            .commit(linking_a_created(child(resource(NOTE, "Note"))))
+            .await;
+        assert_eq!(
+            answer,
+            Ok(CommitResult::Rejected {
+                message: format!("Resource {NOTE} already belongs to another space")
+            }),
+            "the created Space's Resource is not written over the row already there"
+        );
+        assert_eq!(
+            aggregate(&store).await,
+            before,
+            "nothing the commit wrote is kept"
+        );
+        store.close().await;
+    }
+
+    // Not a row another writer left: `jsonb` refusing the created Space's
+    // Resource (`22P05`) fails the commit unclassified, as on the update
+    // path, rather than refusing it as a Resource another Space owns.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_a_created_space_whose_resource_jsonb_refuses_unclassified() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        seed(&store, &[&meta(false)]).await;
+        let before = aggregate(&store).await;
+        let answer = store
+            .commit(linking_a_created(child(resource(NOTE, "nul \u{0} here"))))
+            .await;
+        let Err(RepositoryError::Unclassified(message)) = &answer else {
+            panic!("expected an unclassified failure, got {answer:?}");
+        };
+        assert!(message.contains("22P05"), "{message}");
+        assert_eq!(
+            aggregate(&store).await,
+            before,
+            "nothing the commit wrote is kept"
+        );
+        store.close().await;
+    }
+
+    // Deleting the child's Resource rows deletes its Space row too, so the
+    // Space row is gone when the commit deletes it.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_a_commit_deleting_a_space_whose_row_is_already_gone() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        seed(
+            &store,
+            &[&meta(true), &target_space(CHILD, "Child", &[NOTE])],
+        )
+        .await;
+        let before = aggregate(&store).await;
+        after(
+            &database,
+            "DELETE",
+            "resources",
+            &format!("DELETE FROM spaces WHERE id = '{CHILD}'"),
+        )
+        .await;
+        let answer = store
+            .commit(commit_of(vec![
+                SpaceChange::Delete {
+                    space_id: space(CHILD),
+                    expected_revision: host::Revision::FIRST,
+                },
+                update_at(&meta(false), 0),
+            ]))
+            .await;
+        assert_eq!(
+            answer,
+            Err(RepositoryError::Unclassified(format!(
+                "Space {CHILD} disappeared during commit"
+            ))),
+            "a deletion that removes no row fails the commit"
+        );
+        assert_eq!(
+            aggregate(&store).await,
+            before,
+            "nothing the commit wrote is kept"
+        );
+        store.close().await;
+    }
+
+    // The update holds the child's row lock, and dropping the Resources it
+    // no longer holds deletes its Space row, so the row is gone when the
+    // commit writes it.
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_a_commit_updating_a_space_whose_row_is_already_gone() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        let held = target_space(CHILD, "Child", &[NOTE]);
+        seed(&store, &[&meta(true), &held]).await;
+        let before = aggregate(&store).await;
+        after(
+            &database,
+            "DELETE",
+            "resources",
+            &format!("DELETE FROM spaces WHERE id = '{CHILD}'"),
+        )
+        .await;
+        let answer = store
+            .commit(commit_of(vec![update_at(&retitled(&held, "Renamed"), 0)]))
+            .await;
+        assert_eq!(
+            answer,
+            Err(RepositoryError::Unclassified(format!(
+                "Space {CHILD} disappeared under its row lock"
+            ))),
+            "an update that writes no row fails the commit"
+        );
+        assert_eq!(
+            aggregate(&store).await,
+            before,
+            "nothing the commit wrote is kept"
+        );
+        store.close().await;
+    }
+}
+
+/// Every operation needs every table the migrations make, however few it
+/// reads (Storage ST-7), on PostgreSQL as on SQLite.
+mod given_a_database_missing_a_table {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn fails_every_operation_as_broken_naming_the_table() {
+        let database = Fresh::new().await;
+        database.execute("DROP TABLE assets").await;
+        let store = database.open();
+        let answers = [
+            store.load_meta_space_id().await.map(drop),
+            store.list_spaces().await.map(drop),
+            store.load_space(space(PRESENTATION)).await.map(drop),
+            store.load_aggregate().await.map(drop),
+        ];
+        store.close().await;
+        for answer in answers {
+            assert!(
+                matches!(&answer, Err(RepositoryError::BrokenStoredState(words)) if words.contains("assets")),
+                "broken stored state naming the missing table: {answer:?}"
+            );
+        }
+    }
+}
+
+/// The test-support hook the recreated-rows contract cases use: it replaces
+/// one Space's Resource rows in the next commit writing that Space, and in no
+/// other commit.
+mod given_resource_rows_to_recreate_for_one_space {
+    use super::*;
+    use repository_contract::{
+        commit as commit_of, retitled, seed, space_holding, space_resource, target_space,
+        update as update_at,
+    };
+
+    const META: &str = "c0000000-0000-4000-8000-0000000000d1";
+    const CHILD: &str = "c0000000-0000-4000-8000-0000000000d2";
+    const LINK: &str = "c0000000-0000-4000-8000-0000000001d2";
+    const NOTE: &str = "c0000000-0000-4000-8000-0000000002d2";
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn leaves_them_to_the_next_commit_writing_that_space() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        let held = target_space(CHILD, "Child", &[NOTE]);
+        let linking = space_holding(META, "Meta", vec![space_resource(LINK, CHILD)]);
+        seed(&store, &[&linking, &held]).await;
+        let child = loaded(&store, CHILD).await;
+        store.recreate_before_row_lock(target_space(CHILD, "Child", &[]));
+
+        let answer = store
+            .commit(commit_of(vec![update_at(
+                &retitled(&linking, "Renamed"),
+                0,
+            )]))
+            .await
+            .unwrap();
+        assert!(committed(&answer), "{answer:?}");
+        assert_eq!(
+            loaded(&store, CHILD).await,
+            child,
+            "a commit writing another Space leaves the child's rows alone"
+        );
+
+        store.take_resource_writes();
+        let answer = store
+            .commit(commit_of(vec![update_at(&retitled(&held, "Renamed"), 0)]))
+            .await
+            .unwrap();
+        assert!(committed(&answer), "{answer:?}");
+        assert_eq!(
+            store.take_resource_writes(),
+            [NOTE],
+            "the child's commit meets its rows recreated without the note, and writes it"
+        );
+        store.close().await;
+    }
+}
+
+/// Closing the repository closes its connections.
+mod given_a_closed_repository {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn holds_no_connection_to_the_database() {
+        let database = Fresh::new().await;
+        let store = database.open();
+        assert_eq!(store.load_meta_space_id().await, Ok(None));
+        store.close().await;
+        let others = format!(
+            "SELECT count(*)::text FROM pg_stat_activity \
+             WHERE datname = '{}' AND pid <> pg_backend_pid()",
+            database.name
+        );
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let open = database.scalar(&others).await.unwrap();
+            if open == "0" {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the closed repository still holds {open} connection(s)"
+            );
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+}
