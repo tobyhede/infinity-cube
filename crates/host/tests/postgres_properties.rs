@@ -42,10 +42,8 @@ mod postgres_support;
 )]
 mod repository_contract;
 
-use std::collections::BTreeSet;
-
 use commit_sequences::{
-    Case, Expected, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
+    Case, Expected, Fixed, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
     memory_at, revision_statement, start_revisions,
 };
 use host::PostgresSpaceRepository;
@@ -116,70 +114,133 @@ proptest! {
     }
 }
 
+/// Run `fixed` on the memory store and on PostgreSQL, comparing every answer
+/// and the final aggregate, and assert that each step made the answer it
+/// exists to reach: a step that made no commit, or a different answer on
+/// both, fails here rather than passing as agreement.
+async fn assert_reaches(fixed: Fixed, sequence: &str) {
+    let answered = run(fixed.case()).await;
+    assert_eq!(
+        answered,
+        fixed.answers(),
+        "{sequence}: each step reaches the answer it exists for, on memory and PostgreSQL alike"
+    );
+}
+
 /// A fixed sequence reaching every kind of answer on PostgreSQL, Resources of
 /// no plugin, placements holding Map content and the ceiling among them, so
 /// the comparison holds for each whatever the generator happens to draw.
 #[tokio::test]
 #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
 async fn answers_every_kind_of_answer_as_the_memory_store_does() {
-    let steps = [
-        Step::Add {
-            space: 1,
-            note: 1,
-            of_no_plugin: true,
-            revision: Expected::Current,
-        },
-        Step::Add {
-            space: 1,
-            note: 2,
-            of_no_plugin: true,
-            revision: Expected::Current,
-        },
-        Step::Arrange { space: 1, x: 40 },
-        Step::Retitle {
-            space: 0,
-            revision: Expected::Ahead,
-        },
-        Step::Move {
-            from: 1,
-            to: 2,
-            index: 3,
-            receiver_first: true,
-        },
-        Step::Retitle {
-            space: 2,
-            revision: Expected::Current,
-        },
-        Step::Create {
-            space: 2,
-            linked: true,
-            meta_first: false,
-        },
-        Step::Twice {
-            space: 1,
-            delete_first: true,
-        },
-        Step::DropGraph { space: 0 },
-        Step::Delete {
-            space: 2,
-            unlinking: Unlinking::Dropped,
-            updates_first: true,
-            revision: Expected::Current,
-        },
-    ];
-    let kinds = run(Case {
-        start: [Start::First, Start::First, Start::BelowCeiling(1)],
-        steps: steps.into_iter().map(|step| (step, 0x81)).collect(),
-    })
-    .await;
-    assert_eq!(
-        kinds.into_iter().collect::<BTreeSet<_>>(),
-        BTreeSet::from([
-            "aggregate-refused",
+    let steps = vec![
+        (
+            Step::Add {
+                space: 1,
+                note: 1,
+                of_no_plugin: true,
+                revision: Expected::Current,
+            },
             "committed",
+        ),
+        (
+            Step::Add {
+                space: 1,
+                note: 2,
+                of_no_plugin: true,
+                revision: Expected::Current,
+            },
+            "committed",
+        ),
+        (Step::Arrange { space: 1, x: 40 }, "committed"),
+        (
+            Step::Retitle {
+                space: 0,
+                revision: Expected::Ahead,
+            },
             "conflict",
+        ),
+        (
+            Step::Move {
+                from: 1,
+                to: 2,
+                index: 3,
+                receiver_first: true,
+            },
+            "committed",
+        ),
+        (
+            Step::Retitle {
+                space: 2,
+                revision: Expected::Current,
+            },
             "invariant-failure",
-            "rejected"
-        ]),
-    );
+        ),
+        (
+            Step::Create {
+                space: 2,
+                linked: true,
+                meta_first: false,
+            },
+            "committed",
+        ),
+        (
+            Step::Twice {
+                space: 1,
+                delete_first: true,
+            },
+            "rejected",
+        ),
+        (Step::DropGraph { space: 0 }, "aggregate-refused"),
+        (
+            Step::Delete {
+                space: 2,
+                unlinking: Unlinking::Dropped,
+                updates_first: true,
+                revision: Expected::Current,
+            },
+            "committed",
+        ),
+    ];
+    assert_reaches(
+        Fixed {
+            start: [Start::First, Start::First, Start::BelowCeiling(1)],
+            steps,
+        },
+        "every kind of answer",
+    )
+    .await;
+}
+
+/// The TypeScript differential's scenarios that need no link or ceiling,
+/// each compared on PostgreSQL on every run, as that test's fixed
+/// `examples` are.
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn answers_each_differential_scenario_as_the_memory_store_does() {
+    assert_reaches(commit_sequences::scenario_steps(), "the scenario steps").await;
+}
+
+/// Placing Resources, drawing an Edge, adding a Graph and committing near
+/// the revision ceiling.
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn answers_the_map_internal_and_ceiling_steps_as_the_memory_store_does() {
+    assert_reaches(
+        commit_sequences::map_internal_and_ceiling_steps(),
+        "the map-internal and ceiling steps",
+    )
+    .await;
+}
+
+/// Linking a Space, and deleting a linked Space with its links untouched,
+/// retitled or dropped.
+#[tokio::test]
+#[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+async fn answers_the_linking_and_deletion_steps_as_the_memory_store_does() {
+    assert_reaches(
+        commit_sequences::linking_and_deletion_steps(),
+        "the linking and deletion steps",
+    )
+    .await;
 }

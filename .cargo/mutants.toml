@@ -12,9 +12,8 @@ examine_globs = [
 test_tool = "nextest"
 
 # Build only the test binaries the audit runs: the library's unit tests, each
-# `postgres*` test file and the CLI's `serve_postgres`. The CLI is named here
-# rather than in `test_package`, which cargo-mutants 27.1.0 did not pass to
-# the build.
+# `postgres*` test file and the CLI's `serve_postgres`, which is built
+# through `--package=infinity-cube`.
 additional_cargo_args = [
   "--locked",
   "--package=infinity-cube",

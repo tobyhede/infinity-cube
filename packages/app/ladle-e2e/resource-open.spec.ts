@@ -687,6 +687,43 @@ test(
   },
 );
 
+/** A command's glyph as it is drawn: its SVG's markup. */
+const glyphOf = (command: Locator): Promise<string> =>
+  command.locator('svg').evaluate((svg) => svg.innerHTML);
+
+test(
+  'Open and Close each draw a glyph of their own on the rail',
+  { tag: '@parity:resource-open-and-close-draw-their-own-glyphs' },
+  async ({ page }) => {
+    await open(page, openCloseStory);
+    const resource = page
+      .getByRole('region', { name: 'Interactive Resource' })
+      .locator('.react-flow__node');
+    await selectResource(resource);
+    const commands = (await resourceToolbar(page, resource)).getByTestId('canvas-resource-actions');
+    const command = (name: string) => commands.getByRole('button', { name, exact: true });
+    const others = async (except: string): Promise<string[]> => {
+      const glyphs: string[] = [];
+      for (const button of await commands.getByRole('button').all()) {
+        if ((await button.getAttribute('aria-label')) !== except) {
+          glyphs.push(await glyphOf(button));
+        }
+      }
+      return glyphs;
+    };
+
+    const openGlyph = await glyphOf(command('Open Resource Strategies'));
+    expect(openGlyph).not.toBe('');
+    expect(await others('Open Resource Strategies')).not.toContain(openGlyph);
+
+    await command('Open Resource Strategies').click();
+    const closeGlyph = await glyphOf(command('Close Resource Strategies'));
+    expect(closeGlyph).not.toBe('');
+    expect(closeGlyph).not.toBe(openGlyph);
+    expect(await others('Close Resource Strategies')).not.toContain(closeGlyph);
+  },
+);
+
 const imageStory = '/?story=components--resource--image-resource&mode=preview';
 
 /** The picture's box and the region the host gives its plugin, in screen pixels. */

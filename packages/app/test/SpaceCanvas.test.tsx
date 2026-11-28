@@ -180,6 +180,7 @@ async function mountGraph(
   initialNodes: ResourceFlowNode[] = [resourceNode('A')],
   onSelectResource: (resourceId: string) => void = () => undefined,
   resourceResize: ResourceResize = {
+    drawEditors: () => undefined,
     beginResize: () => undefined,
     previewResize: () => undefined,
     finishResize: () => undefined,
@@ -722,6 +723,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     opened.data.selectedForAuthoring = true;
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
+      drawEditors: vi.fn(),
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
@@ -757,6 +759,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
     const resourceResize: ResourceResize = {
+      drawEditors: vi.fn(),
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
@@ -779,6 +782,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
     const resourceResize: ResourceResize = {
+      drawEditors: vi.fn(),
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
@@ -814,6 +818,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     opened.data.mapContent = { open: true };
     opened.data.selectedForAuthoring = true;
     const resourceResize: ResourceResize = {
+      drawEditors: vi.fn(),
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),

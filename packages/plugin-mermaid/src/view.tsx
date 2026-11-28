@@ -9,16 +9,17 @@ import {
   type RefObject,
 } from 'react';
 import { z } from 'zod';
-import { Check, Maximize2, Minimize2, Pencil, Workflow, X } from 'lucide-react';
+import { Check, Pencil, Workflow, X } from 'lucide-react';
 import {
   isStoredAsset,
   lineFeedText,
   titleName,
   type AssetRef,
-  type Size,
 } from '@project/resource-api/domain';
 import {
+  CloseIcon,
   definePluginView,
+  OpenIcon,
   Own,
   Rail,
   refusalOf,
@@ -43,14 +44,14 @@ import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './merm
  * The Mermaid plugin's view (ADR 0142, ADR 0158). It draws its Title, and its
  * diagram once the
  * source asset is read and Mermaid has drawn it, where its Map content says
- * it is Open. Open and Close are its rail commands, and Opening carries a size
- * hint for the diagram drawn at a reading width. Editing is its own mode: a
+ * it is Open. Open and Close are its rail commands, each one Map content
+ * commit that changes no size (ADR 0178). Editing is its own mode: a
  * Claim, the source editor, a draft, and four ways out (Save, `Mod-Enter`,
  * Cancel, `Escape`), Save storing the source and committing its URL. A click
  * elsewhere leaves the draft up.
  */
 
-/** The width the size hint asks for at least, so a diagram is drawn at a legible size. */
+/** The width Mermaid lays a diagram out at, unseen; the drawn diagram is scaled to the rect's width. */
 export const READING_WIDTH = 640;
 
 /** The inset the diagram and its notes are drawn at inside the rect. */
@@ -58,12 +59,6 @@ const INSET = 12;
 
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
-
-/**
- * How long Opening waits for Mermaid to draw the diagram, and then for its
- * fonts to load, before Opening without them.
- */
-const LOAD_WAIT = 2000;
 
 /** The text of the asset at a URL, as far as it has been read. */
 type Text =
@@ -271,27 +266,6 @@ const createKnownText = (): KnownText => {
 };
 
 /**
- * Resolve once the fonts `element` is set in are ready, as a diagram's labels
- * are, or after {@link LOAD_WAIT}, whichever is first. Its timer goes when
- * `signal` aborts or it resolves.
- */
-const laidOut = (element: HTMLElement, signal: AbortSignal): Promise<void> => {
-  const pending: Promise<void>[] = [];
-  // A document without a font loading interface, as jsdom's, has no fonts to wait for.
-  const document: Partial<Pick<Document, 'fonts'>> = element.ownerDocument;
-  if (document.fonts !== undefined) pending.push(document.fonts.ready.then(() => undefined));
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const stop = () => clearTimeout(timer);
-  signal.addEventListener('abort', stop, { once: true });
-  return Promise.race([
-    Promise.all(pending).then(() => undefined),
-    new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, LOAD_WAIT);
-    }),
-  ]).finally(stop);
-};
-
-/**
  * A running edit: the draft, the text it is measured against, which is the
  * text the edit began from or last Saved, and whether a Save is under way.
  */
@@ -325,8 +299,7 @@ function MermaidView({
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  const [measuring, setMeasuring] = useState(false);
-  const text = useText(url, surface.assets, known, open || measuring);
+  const text = useText(url, surface.assets, known, open);
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -334,11 +307,9 @@ function MermaidView({
   const [refusal, setRefusal] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const claim = useRef<Claim | null>(null);
-  const measurer = useRef<HTMLDivElement | null>(null);
   const root = useRef<HTMLDivElement | null>(null);
   const scratch = useRef<HTMLDivElement | null>(null);
   const scheme = useScheme(root);
-  const [drawWaited, setDrawWaited] = useState(false);
   const railBand = useRailBand();
 
   // A release is asked once: the host completes one asked during exclusive
@@ -355,9 +326,8 @@ function MermaidView({
   useEffect(() => release, [release]);
 
   const readable = text.state === 'read' ? text.text : null;
-  // The diagram is drawn while it is Open or being measured to Open, and not
-  // while the draft replaces it.
-  const drawable = editing === null && (open || measuring) ? readable : null;
+  // The diagram is drawn while it is Open, and not while the draft replaces it.
+  const drawable = editing === null && open ? readable : null;
   const diagram = useDiagram(drawable, scheme, render, scratch);
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
   const mayEdit = open && readable !== null && mayAuthor;
@@ -368,7 +338,9 @@ function MermaidView({
 
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
-    const held = takeClaim();
+    // Taken to edit in place: the canvas draws the editor at the Edit size it
+    // keeps for this Map while the Claim is held (ADR 0178).
+    const held = takeClaim({ inPlace: {} });
     if (held === undefined) return;
     claim.current = held;
     setRefusal(null);
@@ -434,9 +406,9 @@ function MermaidView({
   }, [end]);
 
   const commitMap = useCallback(
-    (next: MermaidMapContent, sizeHint?: Size) => {
+    (next: MermaidMapContent) => {
       if (mapCommit === undefined) return;
-      const committed = sizeHint === undefined ? mapCommit(next) : mapCommit(next, { sizeHint });
+      const committed = mapCommit(next);
       // What an earlier gesture was refused is cleared by the next press, not
       // by this answer, which may land after an Edit from Closed is answered.
       void committed.then(
@@ -454,50 +426,6 @@ function MermaidView({
     [mapCommit],
   );
 
-  // Opening measures the diagram at a reading width first, once its source is
-  // read, Mermaid has drawn it and its fonts have loaded, then commits Open
-  // with what it measured as one size hint: asked once, for this gesture. A
-  // source that cannot be read, or a diagram Mermaid has not drawn within
-  // LOAD_WAIT, has no size to hint at. The measurer is drawn only until it has
-  // measured.
-  const width = Math.max(surface.size.width, READING_WIDTH);
-  const opening = useRef({ commitMap, width });
-  useEffect(() => {
-    opening.current = { commitMap, width };
-  }, [commitMap, width]);
-  const textState = text.state;
-  const diagramState = textState === 'read' ? diagram.state : null;
-  const awaitingDiagram = diagramState === 'drawing' && !drawWaited;
-  useEffect(() => {
-    // Mermaid may be fetched, or stall, while Opening waits: past LOAD_WAIT it
-    // Opens without a hint rather than leaving the press unanswered.
-    if (!measuring || !awaitingDiagram) return undefined;
-    const timer = setTimeout(() => setDrawWaited(true), LOAD_WAIT);
-    return () => clearTimeout(timer);
-  }, [measuring, awaitingDiagram]);
-  useEffect(() => {
-    // A diagram is measured once Mermaid has drawn it, or failed to.
-    if (!measuring || textState === 'reading' || awaitingDiagram) return undefined;
-    const element = measurer.current;
-    const measured = new AbortController();
-    const { signal } = measured;
-    void (element === null ? Promise.resolve() : laidOut(element, signal)).then(() => {
-      if (signal.aborted) return;
-      setMeasuring(false);
-      setDrawWaited(false);
-      const now = opening.current;
-      if (textState !== 'read' || element === null || diagramState === 'drawing') {
-        now.commitMap({ open: true });
-        return;
-      }
-      // The measurer draws the Title as an Open one is drawn, above the
-      // diagram, both at the width the hint asks for.
-      const height = element.scrollHeight + 2 * INSET;
-      now.commitMap({ open: true }, { width: Math.round(now.width), height: Math.round(height) });
-    });
-    return () => measured.abort();
-  }, [measuring, textState, diagramState, awaitingDiagram]);
-
   const commands = useMemo((): readonly RailCommand[] => {
     // Open and Close are one command whose name swaps, so a keyboard author's
     // focus stays on it across both.
@@ -506,7 +434,7 @@ function MermaidView({
         kind: 'action',
         id: 'open-close',
         label: `${opens ? 'Open' : 'Close'} Resource ${name}`,
-        icon: opens ? <Maximize2 size={14} /> : <Minimize2 size={14} />,
+        icon: opens ? <OpenIcon /> : <CloseIcon />,
       }) as const;
     if (editing !== null) {
       return [
@@ -552,7 +480,7 @@ function MermaidView({
                 : () => {
                     setRefusal(null);
                     editWhenOpen.current = true;
-                    setMeasuring(true);
+                    commitMap({ open: true });
                   },
             },
           ]
@@ -572,7 +500,7 @@ function MermaidView({
             ...openClose(true),
             run: () => {
               setRefusal(null);
-              setMeasuring(true);
+              commitMap({ open: true });
             },
           },
     ];
@@ -687,25 +615,6 @@ function MermaidView({
         <p role="alert" style={{ margin: 0, padding: `0 ${INSET}px`, fontSize: 12 }}>
           {refusal}
         </p>
-      )}
-      {measuring && text.state !== 'reading' && (
-        <div
-          ref={measurer}
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width,
-            visibility: 'hidden',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
-            <Title />
-          </div>
-          {readable !== null && <DrawnDiagram diagram={diagram} mayEdit={mayEdit} />}
-        </div>
       )}
       <Rail commands={commands} />
     </div>

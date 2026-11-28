@@ -314,6 +314,150 @@ pub struct Case {
     pub steps: Vec<(Step, u8)>,
 }
 
+/// A fixed sequence: the revision each initial Space starts at, and each
+/// step with the answer it exists to reach, so a store comparison over it
+/// holds for that answer whatever a generated case happens to draw.
+#[derive(Debug, Clone)]
+pub struct Fixed {
+    pub start: [Start; 3],
+    pub steps: Vec<(Step, &'static str)>,
+}
+
+impl Fixed {
+    /// The sequence as a case, every snapshot listing its Resources in one
+    /// order that is not ascending.
+    pub fn case(&self) -> Case {
+        Case {
+            start: self.start,
+            steps: self
+                .steps
+                .iter()
+                .map(|(step, _)| (step.clone(), 0x81))
+                .collect(),
+        }
+    }
+
+    /// The answer each step exists to reach, in order.
+    pub fn answers(&self) -> Vec<&'static str> {
+        self.steps.iter().map(|(_, answer)| *answer).collect()
+    }
+}
+
+/// The TypeScript differential's scenarios that need no link or ceiling, in
+/// one sequence from the initial aggregate: "topology-preserving-update",
+/// "update-conflict", "map-internal-update", "graph-added",
+/// "selected-graph-replaced", "create-ordinary-space", "create-conflict",
+/// "delete-conflict", "duplicate-space-change" and "mismatched-snapshot".
+pub fn scenario_steps() -> Fixed {
+    let retitle = |space, revision| Step::Retitle { space, revision };
+    Fixed {
+        start: [Start::First, Start::First, Start::First],
+        steps: vec![
+            (retitle(1, Expected::Current), "committed"),
+            (retitle(1, Expected::Behind), "conflict"),
+            (Step::Arrange { space: 1, x: 7 }, "committed"),
+            (Step::AddGraph { space: 0 }, "committed"),
+            (Step::DropGraph { space: 1 }, "aggregate-refused"),
+            (
+                Step::Create {
+                    space: 2,
+                    linked: true,
+                    meta_first: false,
+                },
+                "committed",
+            ),
+            (
+                Step::Create {
+                    space: 0,
+                    linked: false,
+                    meta_first: false,
+                },
+                "conflict",
+            ),
+            (retitle(3, Expected::Current), "committed"),
+            (
+                Step::Delete {
+                    space: 3,
+                    unlinking: Unlinking::Dropped,
+                    updates_first: false,
+                    revision: Expected::Behind,
+                },
+                "conflict",
+            ),
+            (
+                Step::Twice {
+                    space: 2,
+                    delete_first: false,
+                },
+                "rejected",
+            ),
+            (Step::Mismatched { space: 1, other: 1 }, "rejected"),
+        ],
+    }
+}
+
+/// Placing Resources, drawing an Edge and adding a Graph commit, and
+/// committing at revisions near the ceiling reaches it and then fails: a
+/// Resource of no plugin added at CEILING − 1 takes the Space to the
+/// ceiling, past which an update fails.
+pub fn map_internal_and_ceiling_steps() -> Fixed {
+    Fixed {
+        start: [Start::First, Start::BelowCeiling(1), Start::First],
+        steps: vec![
+            (
+                Step::Add {
+                    space: 1,
+                    note: 0,
+                    of_no_plugin: true,
+                    revision: Expected::Current,
+                },
+                "committed",
+            ),
+            (Step::Arrange { space: 2, x: 9 }, "committed"),
+            (Step::AddGraph { space: 1 }, "committed"),
+            (
+                Step::Retitle {
+                    space: 1,
+                    revision: Expected::Current,
+                },
+                "invariant-failure",
+            ),
+            (
+                Step::Retitle {
+                    space: 1,
+                    revision: Expected::Ahead,
+                },
+                "conflict",
+            ),
+        ],
+    }
+}
+
+/// The TypeScript differential's deletion scenarios: an ordinary Space
+/// links another; deleting a Space two Spaces link, alone, is a conflict
+/// ("partial-deletion"); deleting it while each Space linking it changes but
+/// keeps its link is refused ("incomplete-deletion-proposal"); deleting it
+/// while each drops its link, Meta and an ordinary Space both, commits
+/// ("complete-deletion"); and a link to a Space no longer stored is refused.
+pub fn linking_and_deletion_steps() -> Fixed {
+    let delete = |unlinking| Step::Delete {
+        space: 1,
+        unlinking,
+        updates_first: true,
+        revision: Expected::Current,
+    };
+    Fixed {
+        start: [Start::First, Start::First, Start::First],
+        steps: vec![
+            (Step::Link { from: 2, to: 0 }, "committed"),
+            (delete(Unlinking::Untouched), "conflict"),
+            (delete(Unlinking::Retitled), "aggregate-refused"),
+            (delete(Unlinking::Dropped), "committed"),
+            (Step::Link { from: 0, to: 0 }, "aggregate-refused"),
+        ],
+    }
+}
+
 fn expected() -> impl Strategy<Value = Expected> {
     prop_oneof![
         6 => Just(Expected::Current),
@@ -642,6 +786,7 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                             x: f64::from(at) * 300.0,
                             y: f64::from(*x),
                             size: None,
+                            edit_size: None,
                             content: of_no_plugin.then(chart_map_content),
                         },
                     )

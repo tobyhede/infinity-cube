@@ -377,6 +377,15 @@ fn move_default_map(loaded: &LoadedSpace) -> SpaceCommit {
     }
 }
 
+/// `commit`, its one update also retitling its Space's first Resource.
+fn retitle_a_resource(mut commit: SpaceCommit) -> SpaceCommit {
+    let [SpaceChange::Update { snapshot, .. }] = commit.changes.as_mut_slice() else {
+        panic!("one update");
+    };
+    "Never stored".clone_into(&mut snapshot.resources.first_mut().unwrap().title);
+    commit
+}
+
 async fn loaded(repository: &impl SpaceRepository, id: &str) -> LoadedSpace {
     repository.load_space(space(id)).await.unwrap().unwrap()
 }
@@ -567,13 +576,21 @@ mod statement_order {
 mod races {
     use super::*;
 
-    #[tokio::test]
-    async fn a_revision_moved_under_the_row_lock_conflicts_with_the_space_read_afresh() {
-        let file = migrated().await;
-        let repository = seeded(&file).await;
-        let before = loaded(&repository, PRESENTATION).await;
+    /// Commit `commit`, which retitles a Resource of the Presentation Space
+    /// `before`, with its row lock answering a revision another writer
+    /// moved it to, and answer the steps the commit reached. The commit
+    /// conflicts with the Space as stored, read after the rollback, having
+    /// asked the store to write no Resource row.
+    async fn refused_at_the_row_lock(
+        repository: &SqlSpaceRepository<Scripted>,
+        before: &LoadedSpace,
+        commit: SpaceCommit,
+    ) -> Vec<Step> {
         *repository.store().prior_revision.lock().unwrap() = Some("7".to_owned());
-        let answer = repository.commit(rename(&before, "Lost")).await.unwrap();
+        repository.take_resource_writes();
+        let steps = recording(repository);
+        let answer = repository.commit(commit).await.unwrap();
+        let reached = steps.lock().unwrap().clone();
         assert_eq!(
             answer,
             CommitResult::Conflict(vec![SpaceConflict {
@@ -583,9 +600,66 @@ mod races {
             "the Space as stored, read after the rollback"
         );
         assert_eq!(
-            loaded(&repository, PRESENTATION).await,
+            repository.take_resource_writes(),
+            Vec::<String>::new(),
+            "the commit is refused before any Resource row is written"
+        );
+        assert_eq!(
+            &loaded(repository, PRESENTATION).await,
             before,
             "nothing is written"
+        );
+        reached
+    }
+
+    // Case: refuses a %s-path commit whose row moved before the lock, writing no Resource (fast)
+    #[tokio::test]
+    async fn a_fast_path_commit_whose_row_moved_before_the_lock_conflicts_writing_no_resource() {
+        let file = migrated().await;
+        let repository = seeded(&file).await;
+        let before = loaded(&repository, PRESENTATION).await;
+        let steps = refused_at_the_row_lock(
+            &repository,
+            &before,
+            retitle_a_resource(rename(&before, "Lost")),
+        )
+        .await;
+        assert_eq!(
+            steps,
+            [
+                Step::Locked(LockMode::Shared),
+                Step::RowLock(space(PRESENTATION)),
+                Step::SpaceRead(space(PRESENTATION)),
+            ],
+            "refused on the fast path at its row lock, then the Space read afresh"
+        );
+    }
+
+    // Case: refuses a %s-path commit whose row moved before the lock, writing no Resource (complete-aggregate)
+    #[tokio::test]
+    async fn an_aggregate_path_commit_whose_row_moved_before_the_lock_conflicts_writing_no_resource()
+     {
+        let file = migrated().await;
+        let repository = seeded(&file).await;
+        let before = loaded(&repository, PRESENTATION).await;
+        let steps = refused_at_the_row_lock(
+            &repository,
+            &before,
+            retitle_a_resource(move_default_map(&before)),
+        )
+        .await;
+        assert_eq!(
+            steps,
+            [
+                Step::Locked(LockMode::Shared),
+                Step::HandOff,
+                Step::Locked(LockMode::Exclusive),
+                Step::MetaRead,
+                Step::CompleteRead,
+                Step::RowLock(space(PRESENTATION)),
+                Step::SpaceRead(space(PRESENTATION)),
+            ],
+            "handed on, refused at the complete-aggregate path's row lock, then the Space read afresh"
         );
     }
 

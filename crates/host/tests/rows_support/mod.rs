@@ -10,8 +10,8 @@ use host::{
     MemorySpaceRepository, RepositoryError, Revision, SpaceChange, SpaceCommit, SpaceRepository,
     StoredAsset, decode_commit,
 };
-use intake::SpaceId;
 use intake::json::{JsonValue, parse};
+use intake::{Size, SpaceId};
 
 /// The repository's root directory.
 pub fn repository_root() -> PathBuf {
@@ -182,12 +182,145 @@ fn key_order_free(
     Ok(AggregateLoad::Loaded(aggregate))
 }
 
+/// The Space the script creates beside the Meta Space and keeps.
+const CHILD: &str = "e0000000-0000-4000-8000-000000000020";
+
+/// The Resource of a kind no listed plugin draws, which the script places
+/// with a size and Map content and last commits with other content.
+const CHART: &str = "e0000000-0000-4000-8000-000000000007";
+
+/// Assert that `store` holds the values the script's last steps name, each
+/// written here rather than read from the script, so a field lost both
+/// decoding the script and reading the rows still fails: each Space's
+/// revision and exported revision, the Spaces listed, and, in the Meta
+/// Space, a Title the last commit changes, the content of the kind no
+/// plugin draws, its placement and the Edges.
+async fn assert_holds_what_the_script_names<R: SpaceRepository>(store: &R) {
+    let meta = meta();
+    let loaded = store.load_aggregate().await;
+    let Ok(AggregateLoad::Loaded(aggregate)) = &loaded else {
+        panic!("the aggregate is stored: {loaded:?}");
+    };
+    assert_eq!(
+        aggregate.meta_space_id.as_str(),
+        "e0000000-0000-4000-8000-000000000001",
+        "the Meta Space"
+    );
+    assert_eq!(
+        aggregate
+            .spaces
+            .iter()
+            .map(|space| (
+                space.snapshot.id.as_str(),
+                space.revision.get(),
+                space.exported_revision.map(Revision::get),
+            ))
+            .collect::<Vec<_>>(),
+        [(meta.as_str(), 5, Some(4)), (CHILD, 1, Some(0))],
+        "each Space, its revision and its exported revision"
+    );
+    assert_eq!(
+        store
+            .list_spaces()
+            .await
+            .unwrap()
+            .iter()
+            .map(|space| (space.id.as_str(), space.title.as_str()))
+            .collect::<Vec<_>>(),
+        [(meta.as_str(), "New space"), (CHILD, "Child")],
+        "the Spaces listed"
+    );
+    let space = &aggregate.spaces[0].snapshot;
+    assert_eq!(
+        space.resources[0].title, "Resource one",
+        "the Title the last commit changes"
+    );
+    let chart = space
+        .resources
+        .iter()
+        .find(|resource| resource.id.as_str() == CHART)
+        .expect("the Resource of an unlisted kind");
+    assert_eq!(chart.kind.as_str(), "vnd.example.chart", "its kind");
+    assert_eq!(
+        keys_sorted(&chart.content),
+        parse(
+            r#"{"label":"edited","made":"/assets/zeS2_lTSbTYWCPNCX7jFe0jur7WWD0CZHRP1pmaSfZs","raw":"/assets/QK_y6dLYki5Hr9RkjmlnSXFYeF-9Hahw5xECZr-USIA","series":[]}"#
+        )
+        .unwrap(),
+        "the content of the unlisted kind, as the last commit leaves it"
+    );
+    let map = &space
+        .document
+        .maps
+        .as_ref()
+        .expect("the Meta Space has Maps")[0];
+    assert_eq!(map.positions.len(), 8, "the Map's placements");
+    assert_eq!(
+        map.positions
+            .iter()
+            .find(|(id, _)| id.as_str() == CHART)
+            .map(|(_, placement)| (
+                placement.x,
+                placement.y,
+                placement.size,
+                placement.edit_size,
+                &placement.content
+            )),
+        Some((
+            0.0,
+            300.0,
+            Some(Size {
+                width: 320.0,
+                height: 180.0,
+            }),
+            None,
+            &Some(parse(r#"{"zoom":2}"#).unwrap()),
+        )),
+        "the chart's position, size, absent Edit size and Map content"
+    );
+    assert_eq!(
+        map.graphs[0]
+            .edges
+            .iter()
+            .map(|edge| (
+                edge.from.as_str(),
+                edge.to.as_str(),
+                edge.title.as_deref(),
+                edge.title_hidden,
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (
+                "e0000000-0000-4000-8000-000000000002",
+                "e0000000-0000-4000-8000-000000000005",
+                None,
+                false,
+            ),
+            (
+                "e0000000-0000-4000-8000-000000000005",
+                "e0000000-0000-4000-8000-000000000006",
+                Some("draws"),
+                true,
+            ),
+            (
+                "e0000000-0000-4000-8000-000000000006",
+                CHART,
+                Some("charts"),
+                false,
+            ),
+        ],
+        "the Edges, each Title and whether it is hidden"
+    );
+}
+
 /// Assert that `store` reads as the script run on the memory store: the
 /// aggregate, the Spaces listed, and each asset the script stores, which
-/// must also be the asset the script names. With `keys_by_jsonb`, the
-/// aggregate is compared with the order of an object's keys left out, as
-/// [`key_order_free`] says.
+/// must also be the asset the script names; and, first, that it holds the
+/// values [`assert_holds_what_the_script_names`] writes out. With
+/// `keys_by_jsonb`, the aggregate is compared with the order of an object's
+/// keys left out, as [`key_order_free`] says.
 pub async fn assert_reads_as_the_script<R: SpaceRepository>(store: &R, keys_by_jsonb: bool) {
+    assert_holds_what_the_script_names(store).await;
     let memory = expected().await;
     let (read, expected) = (store.load_aggregate().await, memory.load_aggregate().await);
     if keys_by_jsonb {

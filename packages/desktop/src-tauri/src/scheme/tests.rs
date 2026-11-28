@@ -558,3 +558,31 @@ impl http_conformance::Adapter for Fixture {
 }
 
 http_conformance::cases!(Fixture);
+
+mod given_a_window_an_aggregates_page_opened {
+    use super::*;
+
+    #[tokio::test]
+    async fn its_label_names_that_aggregate_even_once_it_is_closing() {
+        let fixture = open().await;
+        let key = fixture.address.key();
+        let view = fixture
+            .open_aggregates
+            .open_view(key)
+            .expect("the Aggregate is open");
+        let _closed = fixture.open_aggregates.close(key);
+        assert!(
+            is_view_of(&view, key),
+            "Close without saving destroys the windows of an Aggregate the scheme has forgotten"
+        );
+        assert!(
+            !is_view_of(&view, &AggregateKey::of(Path::new("/spaces/other"))),
+            "another Aggregate's windows stay"
+        );
+        assert!(
+            !is_view_of(WINDOW, key),
+            "the Aggregate's own window is not one its page opened"
+        );
+        fixture.stop().await;
+    }
+}

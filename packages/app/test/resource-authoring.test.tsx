@@ -795,9 +795,9 @@ describe('the Resource affordance on the graph', () => {
 
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
-    // Opening measures the text in a hidden copy first, so the Open lands before the text is read.
+    // The Open lands at once, and the text is read once it is drawn (ADR 0178).
     expect(await screen.findByRole('button', { name: 'Close Resource A' })).toBeVisible();
-    expect(screen.getByText('A source')).toBeVisible();
+    expect(await screen.findByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
     await settled(session);
   });

@@ -223,7 +223,7 @@ mod given_a_server_that_refuses_connections {
         store.close().await;
     }
 
-    // Case: names %s unavailable, keeping the refusal on the cause chain
+    // Case: names %s unavailable, keeping the refusal on the cause chain (listSpaces)
     #[tokio::test]
     async fn names_list_spaces_unavailable() {
         let store = open(&url(REFUSING));
@@ -232,7 +232,7 @@ mod given_a_server_that_refuses_connections {
         store.close().await;
     }
 
-    // Case: names %s unavailable, keeping the refusal on the cause chain
+    // Case: names %s unavailable, keeping the refusal on the cause chain (loadSpace)
     #[tokio::test]
     async fn names_load_space_unavailable() {
         let store = open(&url(REFUSING));
@@ -241,7 +241,7 @@ mod given_a_server_that_refuses_connections {
         store.close().await;
     }
 
-    // Case: names %s unavailable, keeping the refusal on the cause chain
+    // Case: names %s unavailable, keeping the refusal on the cause chain (loadMetaSpaceId)
     #[tokio::test]
     async fn names_load_meta_space_id_unavailable() {
         let store = open(&url(REFUSING));
@@ -250,7 +250,7 @@ mod given_a_server_that_refuses_connections {
         store.close().await;
     }
 
-    // Case: names %s unavailable, keeping the refusal on the cause chain
+    // Case: names %s unavailable, keeping the refusal on the cause chain (markExported)
     #[tokio::test]
     async fn names_mark_exported_unavailable() {
         let store = open(&url(REFUSING));
@@ -262,7 +262,7 @@ mod given_a_server_that_refuses_connections {
 
     // `sqlx` keeps no cause chain; a commit whose server refuses it is
     // classified by the failure itself.
-    // Case: walks the cause chain to %s
+    // Case: walks the cause chain to %s (a refused socket)
     #[tokio::test]
     async fn names_a_commit_unavailable_when_its_socket_is_refused() {
         let store = open(&url(REFUSING));
@@ -392,7 +392,7 @@ mod given_a_server_that_refuses_this_client {
         );
     }
 
-    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction
+    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction (28P01)
     #[tokio::test]
     async fn leaves_a_wrong_password_unclassified_inside_and_outside_a_transaction() {
         leaves_unclassified(WRONG_PASSWORD).await;
@@ -422,55 +422,55 @@ mod given_a_server_that_refuses_this_client {
         );
     }
 
-    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction
+    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction (28000)
     #[tokio::test]
     async fn leaves_no_hba_entry_unclassified_inside_and_outside_a_transaction() {
         leaves_unclassified(NO_HBA_ENTRY).await;
     }
 
-    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction
+    // Case: leaves SQLSTATE %s unclassified inside and outside a transaction (3D000)
     #[tokio::test]
     async fn leaves_a_missing_database_unclassified_inside_and_outside_a_transaction() {
         leaves_unclassified(MISSING_DATABASE).await;
     }
 
-    // Case: names SQLSTATE %s unavailable inside and outside a transaction
+    // Case: names SQLSTATE %s unavailable inside and outside a transaction (53300)
     #[tokio::test]
     async fn names_too_many_clients_unavailable_inside_and_outside_a_transaction() {
         names_unreachable(TOO_MANY_CLIENTS).await;
     }
 
-    // Case: names SQLSTATE %s unavailable inside and outside a transaction
+    // Case: names SQLSTATE %s unavailable inside and outside a transaction (57P03)
     #[tokio::test]
     async fn names_a_server_starting_up_unavailable_inside_and_outside_a_transaction() {
         names_unreachable(STARTING_UP).await;
     }
 
-    // Case: recognises SQLSTATE %s raised while connecting
+    // Case: recognises SQLSTATE %s raised while connecting (53300)
     #[tokio::test]
     async fn recognises_too_many_clients_raised_while_connecting() {
         directly(&refusing(TOO_MANY_CLIENTS).await, "53300", true).await;
     }
 
-    // Case: recognises SQLSTATE %s raised while connecting
+    // Case: recognises SQLSTATE %s raised while connecting (57P03)
     #[tokio::test]
     async fn recognises_a_server_starting_up_raised_while_connecting() {
         directly(&refusing(STARTING_UP).await, "57P03", true).await;
     }
 
-    // Case: leaves SQLSTATE %s raised while connecting unclassified
+    // Case: leaves SQLSTATE %s raised while connecting unclassified (28P01)
     #[tokio::test]
     async fn leaves_a_wrong_password_raised_while_connecting_unclassified() {
         directly(&refusing(WRONG_PASSWORD).await, "28P01", false).await;
     }
 
-    // Case: leaves SQLSTATE %s raised while connecting unclassified
+    // Case: leaves SQLSTATE %s raised while connecting unclassified (28000)
     #[tokio::test]
     async fn leaves_no_hba_entry_raised_while_connecting_unclassified() {
         directly(&refusing(NO_HBA_ENTRY).await, "28000", false).await;
     }
 
-    // Case: leaves SQLSTATE %s raised while connecting unclassified
+    // Case: leaves SQLSTATE %s raised while connecting unclassified (3D000)
     #[tokio::test]
     async fn leaves_a_missing_database_raised_while_connecting_unclassified() {
         directly(&refusing(MISSING_DATABASE).await, "3D000", false).await;
@@ -478,7 +478,7 @@ mod given_a_server_that_refuses_this_client {
 
     // `sqlx` keeps no cause chain; a commit meeting a server not yet
     // accepting connections is classified by the failure itself.
-    // Case: walks the cause chain to %s
+    // Case: walks the cause chain to %s (a server not accepting connections yet)
     #[tokio::test]
     async fn names_a_commit_unavailable_when_the_server_is_starting_up() {
         let server = refusing(STARTING_UP).await;
@@ -664,7 +664,7 @@ fn missing_database() -> DatabaseUrl {
 mod given_a_real_server_that_refuses_this_client {
     use super::*;
 
-    // Case: leaves the transactional aggregate read unclassified with the raw handshake refusal
+    // Case: leaves the transactional aggregate read unclassified with the raw handshake refusal (28P01)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn leaves_the_aggregate_read_unclassified_given_a_wrong_password() {
@@ -675,7 +675,7 @@ mod given_a_real_server_that_refuses_this_client {
         store.close().await;
     }
 
-    // Case: leaves the transactional aggregate read unclassified with the raw handshake refusal
+    // Case: leaves the transactional aggregate read unclassified with the raw handshake refusal (3D000)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn leaves_the_aggregate_read_unclassified_given_a_database_that_does_not_exist() {
@@ -685,7 +685,7 @@ mod given_a_real_server_that_refuses_this_client {
         store.close().await;
     }
 
-    // Case: leaves a direct read unclassified with the normalised refusal
+    // Case: leaves a direct read unclassified with the normalised refusal (28P01)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn leaves_a_direct_read_unclassified_given_a_wrong_password() {
@@ -696,7 +696,7 @@ mod given_a_real_server_that_refuses_this_client {
         store.close().await;
     }
 
-    // Case: leaves a direct read unclassified with the normalised refusal
+    // Case: leaves a direct read unclassified with the normalised refusal (3D000)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn leaves_a_direct_read_unclassified_given_a_database_that_does_not_exist() {
@@ -886,7 +886,7 @@ mod given_a_real_server {
 
     // A failure `COMMIT` raises is classified by its SQLSTATE, as one on a
     // statement is.
-    // Case: walks the cause chain to %s
+    // Case: walks the cause chain to %s (a serialization failure)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn names_a_serialization_failure_at_commit_unavailable() {
@@ -900,7 +900,7 @@ mod given_a_real_server {
     }
 
     // The connection a commit holds, ended by the server mid-transaction.
-    // Case: walks the cause chain to %s
+    // Case: walks the cause chain to %s (a connection failure)
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn names_a_commit_whose_connection_the_server_ended_unavailable() {
