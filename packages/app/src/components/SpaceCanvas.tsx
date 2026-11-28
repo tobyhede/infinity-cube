@@ -112,6 +112,8 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
+import { visibleCanvasCap } from '../visible-canvas-cap';
+import { editorToShow, useKeepEditorInView } from '../keep-editor-in-view';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import {
@@ -372,6 +374,9 @@ export function SpaceCanvas({
     selectEdge,
     resourceResize,
     reportEmbeddedMapEditing,
+    editors,
+    editorCap: drawnEditorCap,
+    drawnPlacement,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
@@ -399,7 +404,7 @@ export function SpaceCanvas({
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const { createOnCanvas, dropExistingResource, dropSpace, createFromData } = placement;
   const addCanvasResource = useCallback(() => createOnCanvas(ADD_KIND), [createOnCanvas]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
 
   const spaces = useOpenSpaces();
   const thisSpaceId = spaceSession.getState().working.id;
@@ -563,6 +568,42 @@ export function SpaceCanvas({
     connecting === null || connectingFrom === undefined
       ? null
       : { from: connectingFrom, anchor: connecting.anchor };
+  /**
+   * The most an editor is drawn at: the visible canvas at the current zoom,
+   * less a margin (ADR 0178). It follows the zoom, so zooming out draws more
+   * of a large Edit size; a canvas not yet measured caps nothing.
+   */
+  const flowWidth = useStore((flow) => flow.width);
+  const flowHeight = useStore((flow) => flow.height);
+  const flowZoom = useStore((flow) => flow.transform[2]);
+  const editorCap = useMemo(
+    () =>
+      flowWidth === 0 || flowHeight === 0
+        ? undefined
+        : visibleCanvasCap({ width: flowWidth, height: flowHeight }, flowZoom),
+    [flowWidth, flowHeight, flowZoom],
+  );
+  /**
+   * The camera pans the least distance that shows an editor when an edit
+   * begins and when the cap changes, never when a resize or a drag changes its
+   * rect (ADR 0178, `panToEditor`). The rect and the cap are the ones the
+   * render adapter draws at, so both describe the same drawing.
+   */
+  const editorShown = useMemo(
+    () => editorToShow(drawnPlacement, editors),
+    [drawnPlacement, editors],
+  );
+  const flowArea = useMemo(
+    () => ({ width: flowWidth, height: flowHeight }),
+    [flowWidth, flowHeight],
+  );
+  useKeepEditorInView({
+    editor: editorShown,
+    cap: drawnEditorCap,
+    area: flowArea,
+    getViewport,
+    setViewport,
+  });
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
     () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
@@ -634,6 +675,7 @@ export function SpaceCanvas({
     onSelectResource: selectResource,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
+    editorCap,
     mapEmbedding,
   });
   const { bodyEditing, beginTitleEditing } = resourceAuthoring;

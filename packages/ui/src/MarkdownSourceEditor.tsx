@@ -24,6 +24,8 @@ export interface MarkdownSourceEditorProps {
   readonly value: string;
   readonly onValueChange: (value: string) => void;
   readonly ariaLabel: string;
+  /** Read intrinsic dimensions once CodeMirror has attached the initial document. */
+  readonly onReady?: (() => void) | undefined;
   readonly className?: string;
 }
 
@@ -209,7 +211,7 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
 export const MarkdownSourceEditor = forwardRef<
   MarkdownSourceEditorHandle,
   MarkdownSourceEditorProps
->(function MarkdownSourceEditor({ value, onValueChange, ariaLabel, className }, ref) {
+>(function MarkdownSourceEditor({ value, onValueChange, ariaLabel, className, onReady }, ref) {
   const codeMirror = useRef<ReactCodeMirrorRef>(null);
   const latestOnValueChange = useRef(onValueChange);
 
@@ -280,6 +282,7 @@ export const MarkdownSourceEditor = forwardRef<
       theme="none"
       indentWithTab={false}
       extensions={extensions}
+      onCreateEditor={() => onReady?.()}
       onChange={reportValueChange}
       basicSetup={markdownBasicSetup}
     />

@@ -203,7 +203,7 @@ export function pluginSurfaceOperations(
       [...embeddedIn, { resource: resourceId, key: drawing }],
       (running) =>
         commitsFor(host, resourceId, () => replaced() ?? (running() ? null : BUSY), admitted),
-      options?.inPlace,
+      options?.editor,
     );
     if (held === undefined) return undefined;
     return {

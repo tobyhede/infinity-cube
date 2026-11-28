@@ -246,10 +246,7 @@ async function mountOpenSpaces(
   return { session: initial.session, spaces };
 }
 
-/**
- * Open the drawn Intake through its plugin's rail, then begin its edit: a
- * Markdown Resource offers Edit only while Open (ADR 0142).
- */
+/** Open the drawn Intake through its rail, then edit its source. */
 const beginEmbeddedEdit = async (): Promise<void> => {
   fireEvent.click(
     within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
@@ -259,6 +256,12 @@ const beginEmbeddedEdit = async (): Promise<void> => {
   await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Close Resource/ });
   fireEvent.click(
     await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Edit Resource/ }),
+  );
+  // Save becomes available once the mounted source editor has taken its Claim.
+  await waitFor(() =>
+    expect(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+    ).toHaveAttribute('aria-disabled', 'false'),
   );
 };
 
@@ -1162,11 +1165,6 @@ describe('the Map an Open Space Resource draws', () => {
     expect(unavailable(anyPresentControl())).toBe(false);
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await beginEmbeddedEdit();
-    await waitFor(() =>
-      expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
-      ).toBeTruthy(),
-    );
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Resource missing');
     expect(within(controlsOf(parent)).queryByRole('button', { name: /Close Resource/ })).toBeNull();
@@ -1188,7 +1186,7 @@ describe('the Map an Open Space Resource draws', () => {
         within(controlsOf(parent)).getByRole('button', { name: /Close Resource/ }),
       ).toBeTruthy(),
     );
-  });
+  }, 10_000);
 
   it('allows only one content editor across two embeddings of the same target', async () => {
     const document: ResourceDocument = {
@@ -1226,11 +1224,6 @@ describe('the Map an Open Space Resource draws', () => {
       expect(queryCommand(containingNode(HOME_RESOURCE_ID), /^Edit Resource/)).toBeNull(),
     );
     await beginEmbeddedEdit();
-    await waitFor(() =>
-      expect(
-        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
-      ).toBeTruthy(),
-    );
     const duplicate = window.document.querySelector(
       `.react-flow__node[data-id="${embeddedNodeId(HOME_RESOURCE_ID, DRAWN_A)}"]`,
     );
@@ -1828,10 +1821,6 @@ describe('the Map an Open Space Resource draws', () => {
           ?.content,
       ).toEqual({ open: true }),
     );
-    // The edit begins once the Open has drawn the text, a render after it lands.
-    expect(
-      await within(controlsOf(embeddedNode(DRAWN_A))).findByRole('button', { name: /Save/ }),
-    ).toBeTruthy();
     expect(initial.session.getState().working).toEqual(value);
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
   });

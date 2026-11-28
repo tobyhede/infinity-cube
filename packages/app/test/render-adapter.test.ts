@@ -712,7 +712,7 @@ describe('render adapter', () => {
 
     expect(store.getState().resizeDraft).toEqual({
       resourceId: RESOURCE_A,
-      size: { width: 620, height: 440 },
+      requestedSize: { width: 620, height: 440 },
       placement: Placement.fromEntries([
         [RESOURCE_A, { x: 10, y: 20, size: { width: 620, height: 440 } }],
         [RESOURCE_B, { x: 300, y: 200 }],
@@ -728,7 +728,7 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft).toBeNull();
   });
 
-  describe('a Resource edited in place (ADR 0178)', () => {
+  describe('a Resource edited (ADR 0178)', () => {
     const authored = Placement.fromEntries([
       [
         RESOURCE_A,
@@ -763,6 +763,32 @@ describe('render adapter', () => {
       expect(editorPlacement(authored, new Map())).toBe(authored);
     });
 
+    it('uses the suggested width and height when no Edit size is stored', () => {
+      const drawn = editorPlacement(
+        authored,
+        new Map([[RESOURCE_B, { suggestedSize: { width: 640, height: 120 } }]]),
+      );
+      expect(drawn.get(RESOURCE_B)?.size).toEqual({ width: 640, height: 120 });
+      // A stored Edit size wins over a hint.
+      expect(
+        editorPlacement(
+          authored,
+          new Map([[RESOURCE_A, { suggestedSize: { width: 900, height: 900 } }]]),
+        ).get(RESOURCE_A)?.size,
+      ).toEqual({ width: 640, height: 360 });
+    });
+
+    it('is drawn capped at the visible canvas, which stores nothing', () => {
+      const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      expect(drawn.get(RESOURCE_A)).toMatchObject({
+        size: { width: 500, height: 300 },
+        editSize: { width: 640, height: 360 },
+      });
+    });
+
     it('resizes from its Edit size and writes it, never its size', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
@@ -770,7 +796,10 @@ describe('render adapter', () => {
       expect(store.getState().editors).toEqual(new Map([[RESOURCE_A, {}]]));
 
       store.getState().resourceResize.beginResize(RESOURCE_A);
-      expect(store.getState().resizeDraft?.size).toEqual({ width: 640, height: 360 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 640,
+        height: 360,
+      });
       store.getState().resourceResize.previewResize(RESOURCE_A, { width: 700, height: 400 });
       expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
         width: 700,
@@ -783,13 +812,16 @@ describe('render adapter', () => {
       ]);
     });
 
-    it('writes its size again once it is no longer edited in place', () => {
+    it('writes its size again once it is no longer edited', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
       store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
       store.getState().resourceResize.drawEditors(new Map());
       store.getState().resourceResize.beginResize(RESOURCE_A);
-      expect(store.getState().resizeDraft?.size).toEqual({ width: 300, height: 200 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 300,
+        height: 200,
+      });
       store.getState().resourceResize.previewResize(RESOURCE_A, { width: 320, height: 220 });
       store.getState().resourceResize.finishResize(RESOURCE_A);
       expect(spy.completions).toEqual([
@@ -797,7 +829,7 @@ describe('render adapter', () => {
       ]);
     });
 
-    it('drops a resize under way when its Resource stops being edited in place', () => {
+    it('drops a resize under way when its Resource stops being edited', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
       store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
@@ -809,7 +841,7 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([]);
     });
 
-    it('drops a resize under way when its Resource starts being edited in place', () => {
+    it('drops a resize under way when its Resource starts being edited', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
       store.getState().resourceResize.beginResize(RESOURCE_A);
@@ -820,21 +852,7 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([]);
     });
 
-    it('writes nothing on release when the editors it holds no longer match the draft', () => {
-      const spy = authoringSpy({ mapPlacement: authored });
-      const store = createRenderAdapter(spy.authoring);
-      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
-      store.getState().resourceResize.beginResize(RESOURCE_A);
-      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 700, height: 400 });
-      // The editors change without `drawEditors`, which would end the draft
-      // itself, so the release alone decides what is written.
-      store.setState({ editors: new Map() });
-      store.getState().resourceResize.finishResize(RESOURCE_A);
-      expect(spy.completions).toEqual([]);
-      expect(store.getState().resizeDraft).toBeNull();
-    });
-
-    it('keeps a resize under way when another Resource starts being edited in place', () => {
+    it('keeps a resize under way when another Resource starts being edited', () => {
       const spy = authoringSpy({ mapPlacement: authored });
       const store = createRenderAdapter(spy.authoring);
       store.getState().resourceResize.beginResize(RESOURCE_A);
@@ -853,6 +871,138 @@ describe('render adapter', () => {
       store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
       expect(store.getState().editors).toBe(held);
     });
+
+    it('holds the cap the canvas tells it, and keeps it while it is the same', () => {
+      const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      const cap = store.getState().editorCap;
+      expect(cap).toEqual({ width: 500, height: 300 });
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 500,
+        height: 300,
+      });
+      expect(store.getState().editorCap).toBe(cap);
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 500,
+        height: 300,
+      });
+    });
+
+    it('drops a resize under way when the cap changes', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      const editors = new Map([[RESOURCE_A, {}]]);
+      store.getState().resourceResize.drawEditors(editors, { width: 500, height: 300 });
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 520, height: 320 });
+      store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      expect(store.getState().resizeDraft).toBeNull();
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+    });
+
+    it('keeps a resize of a Resource not edited when the cap changes', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      const editors = new Map([[RESOURCE_A, {}]]);
+      store.getState().resourceResize.drawEditors(editors, { width: 500, height: 300 });
+      store.getState().resourceResize.beginResize(RESOURCE_B);
+      store.getState().resourceResize.previewResize(RESOURCE_B, { width: 320, height: 220 });
+      store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 400,
+        height: 250,
+      });
+      store.getState().resourceResize.finishResize(RESOURCE_B);
+      expect(spy.completions).toEqual([
+        { kind: 'resized-resource', resourceId: RESOURCE_B, size: { width: 320, height: 220 } },
+      ]);
+    });
+
+    it('releases a capped editor without storing a size when the handle was only pressed', () => {
+      const spy = authoringSpy({ mapPlacement: authored });
+      const store = createRenderAdapter(spy.authoring);
+      const resize = store.getState().resourceResize;
+      resize.drawEditors(new Map([[RESOURCE_A, {}]]), { width: 200, height: 120 });
+      resize.beginResize(RESOURCE_A);
+      resize.finishResize(RESOURCE_A);
+      expect(store.getState().resizeDraft).toBeNull();
+      expect(spy.completions).toEqual([]);
+    });
+
+    it.each([
+      { resource: RESOURCE_A, suggestedSize: undefined, height: 360 },
+      { resource: RESOURCE_B, suggestedSize: { width: 500, height: 600 }, height: 600 },
+      { resource: RESOURCE_B, suggestedSize: undefined, height: 200 },
+    ])(
+      'retains the uncapped height $height when only the drawn width changes',
+      ({ resource, suggestedSize, height }) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        resize.drawEditors(new Map([[resource, suggestedSize ? { suggestedSize } : {}]]), {
+          width: 280,
+          height: 160,
+        });
+        resize.beginResize(resource);
+        resize.previewResize(resource, { width: 265, height: 170 });
+        resize.finishResize(resource);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: resource, editSize: { width: 265, height } },
+        ]);
+      },
+    );
+
+    it.each([400, 200])(
+      'retains the suggested width on a first height-only resize in a %i-wide viewport',
+      (width) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        const suggestedSize = { width: 600, height: 300 };
+        resize.drawEditors(new Map([[RESOURCE_B, { suggestedSize }]]), { width, height: 500 });
+        resize.beginResize(RESOURCE_B);
+        resize.previewResize(RESOURCE_B, { width: Math.max(width, 260), height: 350 });
+        resize.finishResize(RESOURCE_B);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: RESOURCE_B, editSize: { width: 600, height: 350 } },
+        ]);
+      },
+    );
+
+    it('stores nothing when an outward resize cannot change the drawn editor', () => {
+      const large = Placement.fromEntries([
+        [
+          RESOURCE_A,
+          {
+            x: 10,
+            y: 20,
+            size: { width: 300, height: 200 },
+            editSize: { width: 6000, height: 4000 },
+          },
+        ],
+      ]);
+      const spy = authoringSpy({ mapPlacement: large });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]), {
+        width: 900,
+        height: 700,
+      });
+      store.getState().resourceResize.beginResize(RESOURCE_A);
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 900,
+        height: 700,
+      });
+      store.getState().resourceResize.previewResize(RESOURCE_A, { width: 905, height: 705 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 900,
+        height: 700,
+      });
+      store.getState().resourceResize.finishResize(RESOURCE_A);
+      expect(spy.completions).toEqual([]);
+    });
   });
 
   it('previews and completes a resize of a Closed Resource, keeping it Closed', () => {
@@ -861,7 +1011,7 @@ describe('render adapter', () => {
     const store = createRenderAdapter(spy.authoring);
 
     store.getState().resourceResize.beginResize(RESOURCE_A);
-    expect(store.getState().resizeDraft?.size).toEqual({ width: 260, height: 146 });
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)).toMatchObject({ x: 10, y: 20 });
     store.getState().resourceResize.previewResize(RESOURCE_A, { width: 280, height: 166 });
 
     expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)).toEqual({

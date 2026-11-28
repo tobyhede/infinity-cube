@@ -497,6 +497,7 @@ export function ResourceNode({
         }}
         content={data.ownContent}
         mapContent={data.mapContent}
+        editSize={data.editSize}
         embeddable={data.embeddable}
         outline={data.shape}
         size={size}

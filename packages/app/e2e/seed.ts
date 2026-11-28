@@ -101,13 +101,14 @@ export async function seedPositionedMap(
   return (await seededResponse.json()) as HttpLoadedSpace;
 }
 
-/**
- * Store `text` as a Markdown asset through the host's asset collection, and
- * answer the URL a Markdown Resource's content names it by (ADR 0142).
- */
-export async function storeText(page: Page, text: string): Promise<`/assets/${string}`> {
+/** Store source text through the host and return its asset URL. */
+export async function storeText(
+  page: Page,
+  text: string,
+  mediaType: 'text/markdown' | 'text/vnd.mermaid' = 'text/markdown',
+): Promise<`/assets/${string}`> {
   const stored = await page.request.post('/assets', {
-    headers: { 'Content-Type': 'text/markdown' },
+    headers: { 'Content-Type': mediaType },
     data: Buffer.from(text, 'utf8'),
   });
   expect(stored.ok()).toBe(true);

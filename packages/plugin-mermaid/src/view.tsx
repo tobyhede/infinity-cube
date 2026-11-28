@@ -15,6 +15,7 @@ import {
   lineFeedText,
   titleName,
   type AssetRef,
+  type Size,
 } from '@project/resource-api/domain';
 import {
   CloseIcon,
@@ -52,10 +53,12 @@ import { renderWithMermaid, type DiagramTheme, type RenderDiagram } from './merm
  */
 
 /** The width Mermaid lays a diagram out at, unseen; the drawn diagram is scaled to the rect's width. */
-export const READING_WIDTH = 640;
+const DIAGRAM_WIDTH = 640;
 
 /** The inset the diagram and its notes are drawn at inside the rect. */
 const INSET = 12;
+
+const BUSY = 'Another change is still being made. Try again when it ends.';
 
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
@@ -266,10 +269,31 @@ const createKnownText = (): KnownText => {
 };
 
 /**
+ * Size a source editor with a Title row above it. The plugin's root fills
+ * the inside of the Resource frame. Measure its Title at the width the
+ * source needs, before the canvas changes the Resource's rect.
+ */
+function editorSizeWithTitle(source: Size, titleRow: HTMLElement | null, rect: Size): Size {
+  const inside = titleRow?.parentElement;
+  if (!titleRow || !inside) return source;
+  const width = inside.clientWidth;
+  const height = inside.clientHeight;
+  const previousWidth = titleRow.style.width;
+  titleRow.style.width = `${source.width}px`;
+  const titleHeight = titleRow.scrollHeight;
+  titleRow.style.width = previousWidth;
+  return {
+    width: source.width + (width > 0 ? rect.width - width : 0),
+    height: source.height + titleHeight + (height > 0 ? rect.height - height : 0),
+  };
+}
+
+/**
  * A running edit: the draft, the text it is measured against, which is the
  * text the edit began from or last Saved, and whether a Save is under way.
  */
 interface Editing {
+  readonly claim: Claim | undefined;
   readonly draft: string;
   readonly base: string;
   readonly saving: boolean;
@@ -306,24 +330,14 @@ function MermaidView({
   const takeClaim = surface.claim;
   const [refusal, setRefusal] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
-  const claim = useRef<Claim | null>(null);
+  const titleRow = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement | null>(null);
   const scratch = useRef<HTMLDivElement | null>(null);
   const scheme = useScheme(root);
   const railBand = useRailBand();
 
-  // A release is asked once: the host completes one asked during exclusive
-  // work or an inner Claim when that ends.
-  const release = useCallback(() => {
-    claim.current?.release();
-    claim.current = null;
-  }, []);
-  // Every way an edit ends releases its Claim, and an unmounted view holds
-  // nothing; the host releases its Claims too.
-  useEffect(() => {
-    if (editing === null) release();
-  }, [editing, release]);
-  useEffect(() => release, [release]);
+  const claim = editing?.claim;
+  useEffect(() => () => claim?.release(), [claim]);
 
   const readable = text.state === 'read' ? text.text : null;
   // The diagram is drawn while it is Open, and not while the draft replaces it.
@@ -338,16 +352,26 @@ function MermaidView({
 
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
-    // Taken to edit in place: the canvas draws the editor at the Edit size it
-    // keeps for this Map while the Claim is held (ADR 0178).
-    const held = takeClaim({ inPlace: {} });
-    if (held === undefined) return;
-    claim.current = held;
+    const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
+    if (surface.editSize !== undefined && held === undefined) {
+      setRefusal(BUSY);
+      return;
+    }
     setRefusal(null);
-    // Measured as Save stores it, so a text stored with other line endings
-    // is unchanged until its draft is.
-    setEditing({ draft: readable, base: lineFeedText(readable), saving: false });
-  }, [mayEdit, editing, takeClaim, readable]);
+    // Compare with the editor’s LF line endings so an unchanged CRLF source stays untouched.
+    setEditing({ draft: readable, base: lineFeedText(readable), saving: false, claim: held });
+  }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
+
+  const suggestEditorSize = (source: Size) => {
+    const suggestedSize = editorSizeWithTitle(source, titleRow.current, surface.size);
+    const held = takeClaim?.({ editor: { suggestedSize } });
+    if (held === undefined) {
+      setRefusal(BUSY);
+      setEditing(null);
+      return;
+    }
+    setEditing((now) => (now === null ? null : { ...now, claim: held }));
+  };
 
   const end = useCallback(() => setEditing(null), []);
 
@@ -367,7 +391,7 @@ function MermaidView({
   }, [open, text.state, beginEdit]);
 
   const save = useCallback(() => {
-    if (editing === null || editing.saving) return;
+    if (editing?.claim === undefined || editing.saving) return;
     if (contentCommit === undefined || store === undefined) return;
     const next = lineFeedText(editing.draft);
     if (next === editing.base) {
@@ -375,7 +399,7 @@ function MermaidView({
       return;
     }
     const saved = editing.draft;
-    setEditing({ draft: saved, base: editing.base, saving: true });
+    setEditing({ ...editing, saving: true });
     // The editor stays live while a Save runs: text typed meanwhile is a new
     // draft, which a Save that lands leaves up rather than discarding.
     const settle = (refused: string | null): void => {
@@ -383,7 +407,7 @@ function MermaidView({
       setEditing((now) =>
         now === null || (refused === null && now.draft === saved)
           ? null
-          : { draft: now.draft, base: refused === null ? next : now.base, saving: false },
+          : { ...now, base: refused === null ? next : now.base, saving: false },
       );
     };
     void store(new Blob([next], { type: MERMAID_MEDIA_TYPE }))
@@ -447,7 +471,7 @@ function MermaidView({
                 label: `Save Resource ${name}`,
                 icon: <Check size={14} />,
                 run: save,
-                disabled: editing.saving,
+                disabled: editing.claim === undefined || editing.saving,
                 keyshortcuts: 'Meta+Enter Control+Enter',
               },
             ]),
@@ -549,7 +573,7 @@ function MermaidView({
           position: 'absolute',
           left: 0,
           top: 0,
-          width: READING_WIDTH,
+          width: DIAGRAM_WIDTH,
           height: 0,
           overflow: 'hidden',
           visibility: 'hidden',
@@ -557,6 +581,7 @@ function MermaidView({
         }}
       />
       <div
+        ref={titleRow}
         style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
       >
         <Title />
@@ -589,7 +614,8 @@ function MermaidView({
                   setEditing((now) => (now === null ? now : { ...now, draft }))
                 }
                 ariaLabel={`Mermaid source of ${name}`}
-                autoFocus
+                autoFocus={editing.claim !== undefined}
+                onSuggestedSize={editing.claim === undefined ? suggestEditorSize : undefined}
                 onSave={save}
                 onCancel={escape}
               />

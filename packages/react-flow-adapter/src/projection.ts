@@ -174,6 +174,8 @@ type ResourceNodeCommonData = {
    * entry's, else the plugin's default.
    */
   mapContent: JsonValue;
+  /** The Edit size the Map stores for the Resource (ADR 0178), which its plugin is offered. */
+  editSize?: { readonly width: number; readonly height: number } | undefined;
   /**
    * The Resources this one's content references, as they stand, which the
    * plugin drawing it may draw inside its rect through the host's embedding
@@ -247,6 +249,10 @@ export interface ProjectResourceNodesOptions {
   resourceShape?: (resourceId: ResourceId) => ResourceShape;
   /** The Map content each projected Resource's entry stores; absent, none stores any. */
   mapContent?: (resourceId: ResourceId) => JsonValue | undefined;
+  /** The Edit size each Resource's entry stores, if any (ADR 0178). */
+  editSize?: (
+    resourceId: ResourceId,
+  ) => { readonly width: number; readonly height: number } | undefined;
   /** How each projected Resource is drawn for its Graphs; absent, every one is ink at full strength. */
   resourceEmphasis?: (resourceId: ResourceId) => ResourceEmphasis;
 }
@@ -327,6 +333,7 @@ export function projectResourceNodes(
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         ownContent: resource.content,
         mapContent: resolvedMapContent(resource.kind, options.mapContent?.(resource.id)),
+        editSize: options.editSize?.(resource.id),
         embeddable: referencedResources(space, resource),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,

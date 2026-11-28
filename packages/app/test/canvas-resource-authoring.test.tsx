@@ -389,7 +389,7 @@ describe('canvas Resource authoring', () => {
       space.data.resize?.onResizeStart();
       space.data.resize?.onResize({ width: 280, height: 220 });
     });
-    expect(adapter.getState().resizeDraft?.size).toEqual({ width: 280, height: 220 });
+    expect(adapter.getState().resizeDraft?.requestedSize).toEqual({ width: 280, height: 220 });
     act(() => space.data.resize?.onResizeEnd());
     expect(
       spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID],

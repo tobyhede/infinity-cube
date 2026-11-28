@@ -25,6 +25,8 @@ const reading = (texts: Record<string, string>) => ({
     ),
 });
 
+/** An Edit size the Map stores, so an edit begins at once, measuring nothing (ADR 0178). */
+const STORED_EDIT_SIZE = { width: 640, height: 360 };
 const editable = { content: true, map: true, claim: true, store: true } as const;
 
 describe('the Markdown plugin’s domain half', () => {
@@ -110,9 +112,67 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open, closed]);
   });
 
+  it.each([{}, { editSize: STORED_EDIT_SIZE }])(
+    'explains a refused editor Claim with Edit size %s',
+    async (sizing) => {
+      renderPlugin(markdownPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+        claimRefused: true,
+        ...sizing,
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Another change is still being made. Try again when it ends.',
+      );
+      expect(screen.queryByRole('textbox')).toBeNull();
+    },
+  );
+
+  it('suggests the source editor’s dimensions once per edit without a stored Edit size', async () => {
+    const width = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
+      .mockReturnValue(431);
+    const height = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(187);
+    try {
+      const rendered = renderPlugin(markdownPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      const editor = await screen.findByRole('textbox');
+      expect(width.mock.contexts).toEqual([editor]);
+      expect(height.mock.contexts).toEqual([editor]);
+      fireEvent.change(editor, { target: { value: 'A different draft' } });
+      expect(screen.getByRole('textbox')).toBe(editor);
+      expect(rendered.commits.claims.editors).toEqual([
+        { suggestedSize: { width: 431, height: 187 } },
+      ]);
+      fireEvent.keyDown(editor, { key: 'Escape' });
+      width.mockReturnValue(515);
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(rendered.commits.claims.editors[1]).toEqual({
+        suggestedSize: { width: 515, height: 187 },
+      });
+      expect(rendered.commits.map).toEqual([]);
+    } finally {
+      width.mockRestore();
+      height.mockRestore();
+    }
+  });
+
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
     const stored: string[] = [];
     const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -134,8 +194,8 @@ describe('the Markdown plugin’s view', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     expect(rendered.commits.claims.taken).toBe(1);
-    // Its edit is drawn in place, at the Edit size the canvas keeps (ADR 0178).
-    expect(rendered.commits.claims.inPlace).toEqual([{}]);
+    // A stored Edit size needs no suggestion.
+    expect(rendered.commits.claims.editors).toEqual([{}]);
     const editor = screen.getByRole('textbox', { name: 'Markdown source of Notes' });
     expect(editor).toHaveValue('Old');
     fireEvent.change(editor, { target: { value: 'New\r\nline' } });
@@ -202,6 +262,7 @@ describe('the Markdown plugin’s view', () => {
 
   it('Saves on Mod-Enter, and Cancel and Escape abandon the draft without committing', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -218,7 +279,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(rendered.commits.content).toEqual([]);
-    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, inPlace: [{}, {}] });
+    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, editors: [{}, {}] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', metaKey: true });
@@ -416,6 +477,7 @@ describe('the Markdown plugin’s view', () => {
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -428,11 +490,12 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -451,7 +514,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(markdownPluginView.View, {

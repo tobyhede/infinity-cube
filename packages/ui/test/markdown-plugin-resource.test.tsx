@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_ASSET, type Answer } from '@project/resource-api/domain';
+import type { ClaimOptions } from '@project/resource-api/view';
 import { markdownPlugin } from '@project/plugin-markdown/domain';
 import {
   PluginResource,
@@ -87,6 +88,40 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(commitMap).toHaveBeenCalledWith({ open: true });
   });
 
+  it('reveals the same source editor that suggested the size, without loading a preview image', async () => {
+    let measured: Element | null = null;
+    const claim = vi.fn((_owner: symbol, _options?: ClaimOptions): PluginHostClaim => {
+      measured = document.querySelector('.cm-content');
+      return {
+        release: () => undefined,
+        exclusively: () => Promise.resolve('busy'),
+        unmount: () => undefined,
+      };
+    });
+    render(
+      <WithTexts>
+        <PluginResource
+          {...onTheMap({
+            state: 'selected',
+            content: { url: textAsset('# Notes\n\n![Chart](https://example.com/chart.png)') },
+            mapContent: { open: true },
+            operations: {
+              kind: 'markdown',
+              commitContent: () => Promise.resolve<Answer>('completed'),
+              commitStore: () => Promise.resolve(textAsset('stored')),
+              claim,
+            },
+          })}
+        />
+      </WithTexts>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    const editor = await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
+    expect(editor).toBe(measured);
+    expect(editor).toBeVisible();
+    expect(claim).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps no band clear for a rail on the Stage, which draws none', async () => {
     render(
       <WithTexts>
@@ -134,7 +169,13 @@ describe('a Markdown Resource drawn by the application', () => {
         claimHolder: (drawing) =>
           holder === null ? 'none' : holder === drawing ? 'this-drawing' : 'another-drawing',
       };
-      const drawing = { state: 'selected', mapContent: { open }, operations } as const;
+      // An Edit size the Map stores, so the edit begins at once (ADR 0178).
+      const drawing = {
+        state: 'selected',
+        mapContent: { open },
+        editSize: { width: 640, height: 360 },
+        operations,
+      } as const;
       const content = { url: textAsset('# Notes\n\nShared text.') };
       return (
         <>

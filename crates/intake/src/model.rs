@@ -82,19 +82,18 @@ pub struct Size {
     pub height: f64,
 }
 
-/// What a Map stores for one Resource: its origin, and optionally its size and
-/// its plugin's Map content (ADR 0142).
+/// What a Map stores for one Resource: its origin and optional Display size,
+/// Edit size and plugin Map content.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Placement {
     /// Its origin's x.
     pub x: f64,
     /// Its origin's y.
     pub y: f64,
-    /// Its size, absent for the Closed Size.
+    /// Its Display size, defaulting to the Closed Size.
     pub size: Option<Size>,
-    /// Its Edit size, the size the canvas draws it at while its plugin edits
-    /// it in place (ADR 0178); absent, the editor draws at the larger of its
-    /// plugin's size hint and `size` on each axis, or at `size` with no hint.
+    /// Its Edit size on this Map. With none stored, the canvas uses the plugin's
+    /// suggested size for the editor, falling back to the Display size.
     pub edit_size: Option<Size>,
     /// Its plugin's Map content, absent for the plugin's default.
     pub content: Option<JsonValue>,

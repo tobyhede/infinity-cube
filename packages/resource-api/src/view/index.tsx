@@ -57,19 +57,14 @@ export interface Claim {
   release(): void;
 }
 
-/**
- * A Claim taken to edit in place (ADR 0178): while it is held, the canvas
- * draws the Resource at its Edit size, and a resize writes that size rather
- * than the Resource's own. A `sizeHint` is what the editor is drawn at, at
- * least, while no Edit size is stored; it stores nothing.
- */
-export interface InPlaceEdit {
-  readonly sizeHint?: Size | undefined;
+/** Geometry requested for the lifetime of a Resource's editor. */
+export interface EditorSizing {
+  readonly suggestedSize?: Size | undefined;
 }
 
-/** How a plugin takes its Claim. `inPlace` opts in to editing in place. */
+/** A plugin with an editor opts in to the canvas's Edit size when taking its Claim. */
 export interface ClaimOptions {
-  readonly inPlace?: InPlaceEdit | undefined;
+  readonly editor?: EditorSizing | undefined;
 }
 
 /**
@@ -136,6 +131,8 @@ export interface Surface<C, M> {
   readonly content: Kept<C>;
   readonly map: KeptMap<M>;
   readonly size: Size;
+  /** The Edit size stored on this Map entry. An editor suggests a size when this is absent. */
+  readonly editSize?: Size | undefined;
   readonly selected: boolean;
   readonly claim?: ((options?: ClaimOptions) => OwnClaim<C, M> | undefined) | undefined;
   readonly assets: Assets;
@@ -355,6 +352,8 @@ export interface RenderedMarkdownProps {
 
 /** What the host draws a source editor with. */
 export interface SourceEditorProps {
+  /** Measure the mounted source editor before revealing it for this edit. */
+  readonly onSuggestedSize?: ((size: Size) => void) | undefined;
   readonly value: string;
   readonly onValueChange: (value: string) => void;
   /** Names the writing surface for a screen reader. */

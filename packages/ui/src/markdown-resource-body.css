@@ -164,6 +164,15 @@
   );
 }
 
+/* The mounted editor contributes its intrinsic dimensions before the canvas sizes its rect. */
+.markdown-resource-body--sizing {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: max-content;
+  height: max-content;
+  visibility: hidden;
+}
+
 /* The keys this surface spends, named where the author is typing.
 
    Drawn the way every application that names an inline shortcut draws one: the

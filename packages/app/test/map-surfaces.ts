@@ -9,6 +9,7 @@ import type { Projection, ResourceResize } from '../src/render-adapter';
 import { renderedFacts, type MapSurfaceReading } from '../src/use-map-surface';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
 import { nextResourceTitle } from '../src/titles';
+import { Placement } from '@project/graph';
 
 /**
  * Hold a canvas surface at one policy, at the Map and Graph it draws now.
@@ -96,6 +97,9 @@ export function canvasReading(
       reportEmbeddedMapEditing: ignore,
       selectResource: ignore,
       selectEdge: ignore,
+      editors: new Map(),
+      editorCap: undefined,
+      drawnPlacement: Placement.fromEntries([]),
       ...rendering,
       editingEmbeddedMap,
       liveProjection: projection,

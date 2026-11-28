@@ -1082,6 +1082,115 @@ const DEEP_DIVE_FIRST_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000007
 const DEEP_DIVE_SECOND_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000074');
 const SECOND_DRAWING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
 
+test('an embedded editor fits its window and restores the authored framing', async ({ page }) => {
+  const response = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
+  expect(response.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await response.json());
+  const editSize = { width: 2000, height: 1500 };
+  const updated = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: DEEP_DIVE_SPACE_ID,
+          expectedRevision: loaded.revision.toString(),
+          snapshot: {
+            ...loaded.snapshot,
+            document: {
+              ...loaded.snapshot.document,
+              maps: loaded.snapshot.document.maps?.map((candidate) =>
+                candidate.id === DEEP_DIVE_MAP_ID
+                  ? {
+                      ...candidate,
+                      positions: {
+                        ...candidate.positions,
+                        [DEEP_DIVE_SECOND_ID]: { x: 432, y: 12, editSize, content: { open: true } },
+                      },
+                    }
+                  : candidate,
+              ),
+            },
+          },
+        },
+      ],
+    },
+  });
+  expect(updated.ok()).toBe(true);
+
+  const root = await seedPositionedMap(
+    page,
+    'Editor window',
+    () => ({
+      [SECOND_DRAWING_ID]: {
+        x: 0,
+        y: 0,
+        size: { width: 640, height: 480 },
+        content: { open: true },
+      },
+    }),
+    [
+      {
+        id: SECOND_DRAWING_ID,
+        document: {
+          title: 'Framed window',
+          kind: 'space',
+          content: {
+            spaceId: DEEP_DIVE_SPACE_ID,
+            map: DEEP_DIVE_MAP_ID,
+            graph: DEEP_DIVE_GRAPH_ID,
+            framing: { centreX: 500, centreY: 70, zoom: 1.25 },
+          },
+        },
+      },
+    ],
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
+  const parent = nodeByTitle(page, 'Framed window');
+  const child = page.locator(
+    `.react-flow__node[data-id="embedded:${SECOND_DRAWING_ID}:${DEEP_DIVE_SECOND_ID}"]`,
+  );
+  await beginPortalEdit(page, parent);
+  await settled(page);
+  const before = await boxOf(child, 'framed Markdown Resource');
+  const parentBefore = await boxOf(parent, 'Space Resource');
+  const edit = (await resourceControls(page, child)).getByRole('button', {
+    name: 'Edit Resource Opening in place',
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  const source = page.getByRole('textbox', { name: 'Markdown source of Opening in place' });
+  await expect(source).toBeVisible();
+  const outer = await boxOf(parent, 'Space Resource');
+  const scale = outer.width / 640;
+  const margin = 48;
+  // Space Resource windows have a 16-unit inset on the top, left and right.
+  // The editor is wider than the window, so exactly one horizontal position fits.
+  const left = outer.x + 16 * scale + margin;
+  const top = outer.y + 16 * scale + margin;
+  await expect
+    .poll(async () => Math.round((await boxOf(child, 'embedded editor')).x - left))
+    .toBe(0);
+  const drawn = await boxOf(child, 'embedded editor');
+  expect(drawn.y).toBeCloseTo(top, 0);
+  expect(drawn.x + drawn.width).toBeCloseTo(outer.x + outer.width - 16 * scale - margin, 0);
+  const footer = await boxOf(parent.getByTestId('space-resource-footer'), 'Space Resource footer');
+  expect(Math.abs(drawn.y + drawn.height - (footer.y - margin))).toBeLessThan(5 * scale);
+  await source.press('Escape');
+  await expect(source).toHaveCount(0);
+  const restored = await boxOf(child, 'Markdown Resource after editing');
+  const parentAfter = await boxOf(parent, 'Space Resource after editing');
+  expect(restored.x - parentAfter.x).toBeCloseTo(before.x - parentBefore.x, 0);
+  expect(restored.y - parentAfter.y).toBeCloseTo(before.y - parentBefore.y, 0);
+  const storedHost = decodeLoadedSpace(
+    await (await page.request.get(`/api/spaces/${root.snapshot.id}`)).json(),
+  );
+  expect(storedHost.revision.toString()).toEqual(root.revision);
+  const storedTarget = decodeLoadedSpace(
+    await (await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`)).json(),
+  );
+  expect(storedTarget.revision).toBe(loaded.revision + 1n);
+});
+
 /**
  * Two Space Resources drawing the same Map are two drawings (ADR 0112), so a
  * drag from a Resource in one authors nothing in the other. While one holds

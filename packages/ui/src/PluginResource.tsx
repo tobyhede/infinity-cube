@@ -19,7 +19,7 @@ import {
   type Resource,
   type ResourceShape,
 } from '@project/core';
-import type { Answer } from '@project/resource-api/domain';
+import type { Answer, Size } from '@project/resource-api/domain';
 import {
   RAIL_BAND,
   type Assets,
@@ -166,6 +166,8 @@ export interface PluginResourceProps {
   readonly content: unknown;
   /** The Map content the plugin is given on this Map. */
   readonly mapContent: JsonValue;
+  /** The Edit size the Map stores for the Resource (ADR 0178), which its plugin is offered. */
+  readonly editSize?: Size | undefined;
   /**
    * The Resources this one's content references, as they stand, which its
    * plugin may draw inside its rect through the embedding (ADR 0142).
@@ -355,6 +357,7 @@ export function PluginSurface(props: PluginResourceProps & { readonly entry: Plu
     content: props.content,
     mapContent: props.mapContent,
     size,
+    editSize: props.editSize,
     selected: state === 'selected' || state === 'editing',
     operations,
     drawing: lifetime.drawing,

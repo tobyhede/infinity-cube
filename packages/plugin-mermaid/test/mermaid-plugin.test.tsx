@@ -24,10 +24,12 @@ const closed: MermaidMapContent = { open: false };
 
 /**
  * What draws a diagram under jsdom, which has no layout for Mermaid: its source
- * as the text of an SVG, and a source that begins `bad` refused as Mermaid
- * refuses one it cannot parse.
+ * as the text of an SVG declaring its size as Mermaid's does, and a source that
+ * begins `bad` refused as Mermaid refuses one it cannot parse.
  */
 const drawn: string[] = [];
+/** The size the stand-in's SVG declares. */
+const DRAWN = { width: 1232, height: 616 };
 const themes: DiagramTheme[] = [];
 const containers: HTMLElement[] = [];
 const drawText: RenderDiagram = (id, source, theme, container) => {
@@ -38,7 +40,9 @@ const drawText: RenderDiagram = (id, source, theme, container) => {
     return Promise.reject(new Error('Parse error on line 1: expecting a diagram type.'));
   }
   const text = source.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
-  return Promise.resolve(`<svg id="${id}" role="img"><text>${text}</text></svg>`);
+  return Promise.resolve(
+    `<svg id="${id}" width="100%" style="max-width: ${DRAWN.width}px;" viewBox="0 0 ${DRAWN.width} ${DRAWN.height}" role="img"><text>${text}</text></svg>`,
+  );
 };
 const mermaidPluginView = mermaidPluginViewWith(drawText);
 
@@ -70,6 +74,8 @@ const reading = (texts: Record<string, string>) => ({
     ),
 });
 
+/** An Edit size the Map stores, so an edit begins at once, measuring nothing (ADR 0178). */
+const STORED_EDIT_SIZE = { width: 640, height: 360 };
 const editable = { content: true, map: true, claim: true, store: true } as const;
 
 describe('the Mermaid plugin’s domain half', () => {
@@ -167,6 +173,64 @@ describe('the Mermaid plugin’s view', () => {
     );
     expect(screen.queryByTestId('mermaid-diagram')).toBeNull();
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
+  });
+
+  it.each([{}, { editSize: STORED_EDIT_SIZE }])(
+    'explains a refused editor Claim with Edit size %s',
+    async (sizing) => {
+      renderPlugin(mermaidPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+        claimRefused: true,
+        ...sizing,
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Another change is still being made. Try again when it ends.',
+      );
+      expect(screen.queryByRole('textbox')).toBeNull();
+    },
+  );
+
+  it('suggests the source editor’s dimensions once per edit without a stored Edit size', async () => {
+    const width = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
+      .mockReturnValue(431);
+    const height = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(187);
+    try {
+      const pendingDiagram = mermaidPluginViewWith(() => new Promise<string>(() => undefined));
+      const rendered = renderPlugin(pendingDiagram.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      const editor = await screen.findByRole('textbox');
+      expect(width.mock.contexts).toEqual([editor]);
+      expect(height.mock.contexts).toEqual([editor]);
+      fireEvent.change(editor, { target: { value: 'A different draft' } });
+      expect(screen.getByRole('textbox')).toBe(editor);
+      expect(rendered.commits.claims.editors).toEqual([
+        { suggestedSize: { width: 431, height: 187 } },
+      ]);
+      fireEvent.keyDown(editor, { key: 'Escape' });
+      width.mockReturnValue(515);
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(rendered.commits.claims.editors[1]).toEqual({
+        suggestedSize: { width: 515, height: 187 },
+      });
+      expect(rendered.commits.map).toEqual([]);
+    } finally {
+      width.mockRestore();
+      height.mockRestore();
+    }
   });
 
   it('says a failure Mermaid gives no words for in its own', async () => {
@@ -365,6 +429,7 @@ describe('the Mermaid plugin’s view', () => {
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
     const stored: string[] = [];
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -386,8 +451,8 @@ describe('the Mermaid plugin’s view', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     expect(rendered.commits.claims.taken).toBe(1);
-    // Its edit is drawn in place, at the Edit size the canvas keeps (ADR 0178).
-    expect(rendered.commits.claims.inPlace).toEqual([{}]);
+    // A stored Edit size needs no suggestion.
+    expect(rendered.commits.claims.editors).toEqual([{}]);
     const editor = screen.getByRole('textbox', { name: 'Mermaid source of Notes' });
     expect(editor).toHaveValue('Old');
     fireEvent.change(editor, { target: { value: 'New\r\nline' } });
@@ -454,6 +519,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Saves on Mod-Enter, and Cancel and Escape abandon the draft without committing', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -470,7 +536,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(rendered.commits.content).toEqual([]);
-    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, inPlace: [{}, {}] });
+    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, editors: [{}, {}] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', metaKey: true });
@@ -668,6 +734,7 @@ describe('the Mermaid plugin’s view', () => {
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -680,11 +747,12 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -703,7 +771,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(mermaidPluginView.View, {

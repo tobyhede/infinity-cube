@@ -13,6 +13,7 @@ import {
   uuidSchema,
   type ResourceId,
 } from '@project/core';
+import type { Size } from '@project/resource-api/domain';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { usePluginAssets, type EntityActionGroup } from '@project/ui';
@@ -114,6 +115,11 @@ export interface CanvasResourceAuthoringInput {
    * one the canvas around it provides.
    */
   readonly mapEmbedding?: MapEmbedding | undefined;
+  /**
+   * The most an editor on this canvas is drawn at: the visible canvas at the
+   * current zoom, less a margin. A canvas awaiting measurement omits it.
+   */
+  readonly editorCap?: Size | undefined;
 }
 
 export interface CanvasResourceAuthoring {
@@ -144,6 +150,7 @@ export function useCanvasResourceAuthoring({
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   plugins,
+  editorCap,
   mapEmbedding: ownMapEmbedding,
 }: CanvasResourceAuthoringInput): CanvasResourceAuthoring {
   const spaces = useOpenSpaces();
@@ -173,7 +180,7 @@ export function useCanvasResourceAuthoring({
     const drawing = held.at(-1);
     return drawing !== undefined && !lent.has(drawing.key);
   });
-  // A plugin that took its Claim to edit in place is drawn at its Edit size,
+  // A plugin that took its Claim to edit is drawn at its Edit size,
   // and resized as an editor, until the Claim ends (ADR 0178). The render
   // adapter is told in a layout effect. The canvas then lays the new placement
   // out through `usePlacementRendering`, an effect and a microtask later, so a
@@ -192,8 +199,8 @@ export function useCanvasResourceAuthoring({
   }, [claimChain, editingDrawings, embeddedIn, nodes]);
   const drawEditors = resourceResize.drawEditors;
   useLayoutEffect(() => {
-    drawEditors(editors);
-  }, [drawEditors, editors]);
+    drawEditors(editors, editorCap);
+  }, [drawEditors, editors, editorCap]);
   useLayoutEffect(() => () => drawEditors(new Map()), [drawEditors]);
   // The Map embedding of the canvas this draws on, which a Space Resource's
   // host chooser writes a choice through (ADR 0142), and which keeps what the

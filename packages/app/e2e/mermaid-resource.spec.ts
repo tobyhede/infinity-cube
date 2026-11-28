@@ -138,10 +138,13 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
 
   const sized = nodeByTitle(page, 'Sized').first();
   const rect = async () =>
-    sized.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
-    }));
+    sized.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      return {
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      };
+    });
   const source = page.getByRole('textbox', { name: 'Mermaid source of Sized' });
   const edit = async () => {
     await (
@@ -161,9 +164,30 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   };
   const size = await rect();
 
-  // With no Edit size stored, the editor is drawn at the Resource's size.
+  // The empty source takes the plugin's suggestion. A longer draft keeps
+  // that size until a later edit measures the saved source again.
   await edit();
-  await expect.poll(rect).toEqual(size);
+  await expect.poll(rect).not.toEqual(size);
+  const initial = await rect();
+  await source.fill(
+    [
+      'flowchart LR',
+      '  Short --> A_longer_destination',
+      '  A --> B',
+      '  B --> C',
+      '  C --> D',
+      '  D --> E',
+      '  E --> F',
+      '  F --> G',
+    ].join('\n'),
+  );
+  expect(await rect()).toEqual(initial);
+  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(source).toHaveCount(0);
+  await edit();
+  await expect.poll(async () => (await rect()).width).toBeGreaterThan(initial.width);
+  await expect.poll(async () => (await rect()).height).toBeGreaterThan(initial.height);
+  const measured = await rect();
 
   // A resize while editing writes the Edit size, and leaves the size alone.
   await selectResource(sized);
@@ -182,8 +206,8 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
   const edited = await rect();
-  expect(edited.width).toBeGreaterThan(size.width);
-  expect(edited.height).toBeGreaterThan(size.height);
+  expect(edited.width).toBeGreaterThan(measured.width);
+  expect(edited.height).toBeGreaterThan(measured.height);
   await expect(source).toBeVisible();
 
   // Cancel draws it at its size again; the next edit draws it at the Edit size.
