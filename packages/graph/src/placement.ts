@@ -182,11 +182,7 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * What the report says is taken **as it stands**: nothing here inverts a
  * derivation, and a reported point is authored exactly. A Resize's
  * displacement is applied by its Edit (ADR 0084), so it leaves nothing to
- * invert. The one displacement that is drawn and not stored, the Resources an
- * editor passes (ADR 0178), is taken out before the report is made:
- * the render adapter reports a drag of such a Resource as its Map position
- * moved by the drag (`packages/app/test/render-adapter.test.ts` › "stores a
- * dragged neighbour it draws aside at its Map position moved by the drag").
+ * invert.
  *
  * The resource's own size and Map content survive the merge: a
  * renderer reports React Flow node positions and nothing else, so only `x` and
@@ -330,6 +326,7 @@ function displace(
   subjectId: ResourceId,
   before: Extent,
   after: Extent,
+  neighbours?: ReadonlySet<ResourceId>,
 ): Placement {
   const subject = placement.get(subjectId);
   if (subject === undefined) return placement;
@@ -339,7 +336,8 @@ function displace(
   const displaced = new Map<ResourceId, ResourcePlacement>();
   let moved = false;
   for (const [resourceId, at] of placement) {
-    const axis = roomAxis(at, subject, before);
+    const axis =
+      neighbours === undefined || neighbours.has(resourceId) ? roomAxis(at, subject, before) : null;
     const x = axis === 'x' ? at.x + room.width : at.x;
     const y = axis === 'y' ? at.y + room.height : at.y;
     if (x !== at.x || y !== at.y) moved = true;

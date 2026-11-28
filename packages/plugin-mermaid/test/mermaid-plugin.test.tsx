@@ -175,6 +175,26 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
   });
 
+  it.each([{}, { editSize: STORED_EDIT_SIZE }])(
+    'explains a refused editor Claim with Edit size %s',
+    async (sizing) => {
+      renderPlugin(mermaidPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+        claimRefused: true,
+        ...sizing,
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Another change is still being made. Try again when it ends.',
+      );
+      expect(screen.queryByRole('textbox')).toBeNull();
+    },
+  );
+
   it.each([open, closed])(
     'suggests the source editor’s dimensions once per edit without a stored Edit size, Map content %j',
     async (mapContent) => {

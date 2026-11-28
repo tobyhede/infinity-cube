@@ -50,10 +50,10 @@ export interface Projection {
 
 export interface ResizeDraft {
   readonly resourceId: ResourceId;
-  readonly requestedSize?: ResourceSize;
+  readonly requestedSize?: ResourceSize | undefined;
   readonly placement: Placement;
   /** The resize is of an editor, so it writes the Edit size (ADR 0178). */
-  readonly editor?: true | undefined;
+  readonly editor?: { readonly initial: ResourceSize; readonly uncapped: ResourceSize } | undefined;
 }
 
 const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boolean =>
@@ -65,6 +65,18 @@ function cappedSize(size: ResourceSize, cap?: ResourceSize): ResourceSize {
     : { width: Math.min(size.width, cap.width), height: Math.min(size.height, cap.height) };
 }
 
+/** Preserve the uncapped size on each axis the gesture leaves visibly unchanged. */
+function resizedEditorSize(
+  editor: NonNullable<ResizeDraft['editor']>,
+  drawn: ResourceSize,
+): ResourceSize | undefined {
+  if (sameSize(drawn, editor.initial)) return undefined;
+  return {
+    width: drawn.width === editor.initial.width ? editor.uncapped.width : drawn.width,
+    height: drawn.height === editor.initial.height ? editor.uncapped.height : drawn.height,
+  };
+}
+
 /**
  * Draw each editor at its stored Edit size or its plugin's suggested size,
  * within the visible canvas. The Map keeps its authored placement.
@@ -73,6 +85,7 @@ export function editorPlacement(
   placement: Placement,
   editors: ReadonlyMap<ResourceId, EditorSizing>,
   cap?: ResourceSize,
+  neighbours?: ReadonlySet<ResourceId>,
 ): Placement {
   let drawn = placement;
   for (const [resourceId, editor] of editors) {
@@ -81,7 +94,7 @@ export function editorPlacement(
     const size = resourceSize(at);
     const capped = cappedSize(at.editSize ?? editor.suggestedSize ?? size, cap);
     if (capped.width === size.width && capped.height === size.height) continue;
-    const displaced = Placement.displace(drawn, resourceId, size, capped);
+    const displaced = Placement.displace(drawn, resourceId, size, capped, neighbours);
     drawn = Placement.place(displaced, resourceId, { ...at, size: capped });
   }
   return drawn;
@@ -286,6 +299,8 @@ export interface RenderAdapterState {
   resizeDraft: ResizeDraft | null;
   /** The Resources edited on this canvas (`ResourceResize.drawEditors`). */
   editors: ReadonlyMap<ResourceId, EditorSizing>;
+  /** Members present at Claim start that have not since been deliberately moved. */
+  editorNeighbours: ReadonlySet<ResourceId>;
   /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
   editorCap: ResourceSize | undefined;
   /**
@@ -389,11 +404,8 @@ function trackDragOrigins(
 }
 
 /**
- * Which settled changes actually ended somewhere other than where the drag
- * began, and where each is stored: its Map position moved by the drag, so a
- * Resource drawn aside by an editor (ADR 0178) is stored where the Map
- * had it plus the drag, never where it was drawn. A Resource with no Map
- * position is stored at its drop point.
+ * A settled Resource takes its exact drop point. Returning to the gesture's
+ * start changes nothing, including when the editor drew it aside.
  *
  * Each change is keyed through `owned`, the identities of the canvas Map's own
  * nodes, so a change for a node this store does not draw contributes nothing.
@@ -408,7 +420,6 @@ function consumeSettledMoves(
   dragOrigins: globalThis.Map<string, MapPosition>,
   beforeById: ReadonlyMap<string, MapPosition>,
   afterById: ReadonlyMap<string, MapPosition>,
-  authored: Placement,
 ): ReadonlyMap<ResourceId, MapPosition> {
   const moved = new Map<ResourceId, MapPosition>();
   for (const change of settled) {
@@ -422,13 +433,7 @@ function consumeSettledMoves(
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
-      const stored = authored.get(resourceId);
-      moved.set(
-        resourceId,
-        stored === undefined
-          ? after
-          : { x: stored.x + after.x - origin.x, y: stored.y + after.y - origin.y },
-      );
+      moved.set(resourceId, after);
     }
   }
   return moved;
@@ -538,6 +543,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     selection: NO_SELECTION,
     resizeDraft: null,
     editors: new Map(),
+    editorNeighbours: new Set(),
     editorCap: undefined,
     editingEmbeddedMap: false,
 
@@ -549,29 +555,44 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         const nextEditors = sameEditors(now.editors, editors) ? now.editors : editors;
         const nextCap = sameSize(now.editorCap, cap) ? now.editorCap : cap;
         if (nextEditors === now.editors && nextCap === now.editorCap) return;
+        const sameClaim =
+          editors.size === now.editors.size &&
+          [...editors.keys()].every((id) => now.editors.has(id));
+        const editorNeighbours = sameClaim
+          ? now.editorNeighbours
+          : new Set(editors.size ? authoring.mapPlacement().keys() : []);
         let draft = now.resizeDraft;
         if (draft !== null) {
-          const changedMode = (draft.editor === true) !== editors.has(draft.resourceId);
-          const changedEditorCap = draft.editor === true && nextCap !== now.editorCap;
+          const changedMode = (draft.editor !== undefined) !== editors.has(draft.resourceId);
+          const changedEditorCap = draft.editor !== undefined && nextCap !== now.editorCap;
           draft =
             changedMode || changedEditorCap
               ? null
               : drawResizeDraft(
                   draft,
-                  editorPlacement(authoring.mapPlacement(), editors, cap),
+                  editorPlacement(authoring.mapPlacement(), editors, cap, editorNeighbours),
                   cap,
                 );
         }
-        set({ editors: nextEditors, editorCap: nextCap, resizeDraft: draft });
+        set({ editors: nextEditors, editorNeighbours, editorCap: nextCap, resizeDraft: draft });
       },
 
       beginResize: (resourceId) => {
         // Pointer movement starts from the rect the author sees.
-        const { editors, editorCap } = get();
-        const placement = editorPlacement(authoring.mapPlacement(), editors, editorCap);
+        const { editors, editorCap, editorNeighbours } = get();
+        const authored = authoring.mapPlacement();
+        const placement = editorPlacement(authored, editors, editorCap, editorNeighbours);
         const at = placement.get(resourceId);
         if (at === undefined) return;
-        const editor = editors.has(resourceId) ? true : undefined;
+        const sizing = editors.get(resourceId);
+        const original = authored.get(resourceId);
+        const editor =
+          sizing === undefined || original === undefined
+            ? undefined
+            : {
+                initial: resourceSize(at),
+                uncapped: original.editSize ?? sizing.suggestedSize ?? resourceSize(original),
+              };
         set({ resizeDraft: { resourceId, placement, editor } });
       },
 
@@ -591,11 +612,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
         if (draft.requestedSize !== undefined) {
-          authoring.complete(
-            draft.editor
-              ? { kind: 'resized-editor', resourceId, editSize: draft.requestedSize }
-              : { kind: 'resized-resource', resourceId, size: draft.requestedSize },
-          );
+          if (draft.editor === undefined) {
+            authoring.complete({ kind: 'resized-resource', resourceId, size: draft.requestedSize });
+          } else {
+            const drawn = cappedSize(draft.requestedSize, get().editorCap);
+            const editSize = resizedEditorSize(draft.editor, drawn);
+            if (editSize !== undefined)
+              authoring.complete({ kind: 'resized-editor', resourceId, editSize });
+          }
         }
         set({ resizeDraft: null });
       },
@@ -636,6 +660,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     selectMap: () => {
       set({
         projection: null,
+        editors: new Map(),
+        editorNeighbours: new Set(),
         dragOrigins: new Map(),
         selection: NO_SELECTION,
         resizeDraft: null,
@@ -758,14 +784,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Only a settled drag compares its last position to the gesture origin.
       // Intermediate pointer frames publish above without paying for this map.
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
-      const moved = consumeSettledMoves(
-        settled,
-        owned,
-        dragOrigins,
-        beforeById,
-        afterById,
-        authoring.mapPlacement(),
-      );
+      const moved = consumeSettledMoves(settled, owned, dragOrigins, beforeById, afterById);
 
       if (moved.size === 0) {
         set({ projection: { ...projection, nodes }, dragOrigins, selection });
@@ -777,7 +796,15 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         dragOrigins,
         selection,
       });
-      authoring.complete({ kind: 'settled-resource-movement', moved });
+      const result = authoring.complete({ kind: 'settled-resource-movement', moved });
+      if (result.kind === 'completed' || result.kind === 'unchanged') {
+        const current = get();
+        if (current.editorNeighbours === state.editorNeighbours && current.editorNeighbours.size) {
+          const remaining = new Set(current.editorNeighbours);
+          for (const id of moved.keys()) remaining.delete(id);
+          set({ editorNeighbours: remaining });
+        }
+      }
     },
 
     changeEdges: (changes) => {
@@ -821,6 +848,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     replacementEpoch = nextEpoch;
     adapter.setState({
       projection: null,
+      editors: new Map(),
+      editorNeighbours: new Set(),
       dragOrigins: new Map(),
       selection: NO_SELECTION,
       resizeDraft: null,

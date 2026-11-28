@@ -49,7 +49,7 @@ export interface EditorPan {
 }
 
 /**
- * Whether the camera pans to an editor, and by how much (ADR 0178): only when
+ * Whether the camera pans to an editor, and by how much (ADR 0182): only when
  * an edit begins or the cap changes, so a resize or a drag of the editor,
  * which changes its rect alone, never pans. `shown` is what the camera showed
  * last; the answer carries what it shows now.
@@ -59,7 +59,7 @@ export function panToEditor(
   editor: EditorToShow | undefined,
   cap: ResourceSize | undefined,
   viewport: Viewport,
-  area: { readonly width: number; readonly height: number },
+  area: ResourceSize,
 ): EditorPan {
   if (editor === undefined || cap === undefined) return { shown: undefined };
   if (
@@ -87,7 +87,7 @@ export function useKeepEditorInView({
   readonly editor: EditorToShow | undefined;
   /** The visible canvas cap, absent while the canvas is not measured. */
   readonly cap: ResourceSize | undefined;
-  readonly area: { readonly width: number; readonly height: number };
+  readonly area: ResourceSize;
   readonly getViewport: () => Viewport;
   readonly setViewport: (viewport: Viewport) => Promise<boolean>;
 }): void {

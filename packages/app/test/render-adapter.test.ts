@@ -579,6 +579,96 @@ describe('render adapter', () => {
     );
   });
 
+  it('keeps a neighbour at its drop across the editor boundary until the next edit', () => {
+    const { authoring, store } = sparsePositionedAdapter();
+    const resize = store.getState().resourceResize;
+    const editors = new Map([[RESOURCE_A, { suggestedSize: { width: 640, height: 360 } }]]);
+    resize.drawEditors(editors);
+    resize.beginResize(RESOURCE_B);
+    const drawn = store.getState().resizeDraft?.placement.get(RESOURCE_B);
+    if (!drawn) throw new Error('The resize must start on the drawn neighbour');
+    resize.finishResize(RESOURCE_B);
+    store
+      .getState()
+      .syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_B, drawn.x, drawn.y)], []);
+    completeDrag(store, RESOURCE_B, 350, 20);
+    expect(authoring.mapPlacement().get(RESOURCE_B)).toMatchObject({ x: 350, y: 20 });
+    resize.beginResize(RESOURCE_B);
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_B)).toMatchObject({
+      x: 350,
+      y: 20,
+    });
+    resize.finishResize(RESOURCE_B);
+    resize.drawEditors(new Map());
+    expect(authoring.mapPlacement().get(RESOURCE_B)).toMatchObject({ x: 350, y: 20 });
+    resize.drawEditors(editors);
+    resize.beginResize(RESOURCE_B);
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_B)?.x).toBeGreaterThan(350);
+  });
+
+  it('keeps an untouched neighbour displaced after a drag returns to its start', () => {
+    const { authoring, store } = sparsePositionedAdapter();
+    const resize = store.getState().resourceResize;
+    resize.drawEditors(new Map([[RESOURCE_A, { suggestedSize: { width: 640, height: 360 } }]]));
+    resize.beginResize(RESOURCE_B);
+    const drawn = store.getState().resizeDraft?.placement.get(RESOURCE_B);
+    if (!drawn) throw new Error('The resize must start on the drawn neighbour');
+    resize.finishResize(RESOURCE_B);
+    store.getState().syncProjection([node(RESOURCE_B, drawn.x, drawn.y)], []);
+    store.getState().changeNodes(moving(RESOURCE_B, drawn.x + 5, drawn.y));
+    store.getState().changeNodes(settled(RESOURCE_B, drawn.x, drawn.y));
+    expect(authoring.mapPlacement().get(RESOURCE_B)).toMatchObject({ x: 300, y: 20 });
+    resize.beginResize(RESOURCE_B);
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_B)).toEqual(drawn);
+  });
+
+  it('authors every deliberate drop in a group while an editor is drawn', () => {
+    const { authoring, store } = sparsePositionedAdapter();
+    const resize = store.getState().resourceResize;
+    resize.drawEditors(new Map([[RESOURCE_A, { suggestedSize: { width: 640, height: 360 } }]]));
+    const drawn = editorPlacement(authoring.mapPlacement(), store.getState().editors);
+    store.getState().syncProjection(
+      [...drawn].map(([id, at]) => node(id, at.x, at.y)),
+      [],
+    );
+    store.getState().changeNodes([...moving(RESOURCE_A, 30, 40), ...moving(RESOURCE_B, 700, 40)]);
+    store.getState().changeNodes([...settled(RESOURCE_A, 30, 40), ...settled(RESOURCE_B, 700, 40)]);
+    expect(authoring.mapPlacement().get(RESOURCE_A)).toMatchObject({ x: 30, y: 40 });
+    expect(authoring.mapPlacement().get(RESOURCE_B)).toMatchObject({ x: 700, y: 40 });
+    resize.beginResize(RESOURCE_B);
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_B)).toMatchObject({
+      x: 700,
+      y: 40,
+    });
+  });
+
+  it('keeps a newly connected Resource at the pointer while editing', () => {
+    const { store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_RESOURCE_ID));
+    store.getState().syncProjection(PROJECTED, []);
+    const resize = store.getState().resourceResize;
+    resize.drawEditors(new Map([[RESOURCE_A, { suggestedSize: { width: 640, height: 360 } }]]));
+    const point = { x: 700, y: 20 };
+    expect(connections(store, authoring).createAndConnect(RESOURCE_B, point, null)).toEqual({
+      kind: 'completed',
+      resourceId: CREATED_RESOURCE_ID,
+    });
+    expect(authoring.mapPlacement().get(CREATED_RESOURCE_ID)).toMatchObject(point);
+    resize.beginResize(CREATED_RESOURCE_ID);
+    expect(store.getState().resizeDraft?.placement.get(CREATED_RESOURCE_ID)).toMatchObject(point);
+  });
+
+  it('authors the exact drop when another Edit moves the dragged Resource', () => {
+    const { store, authoring } = sparsePositionedAdapter();
+    store.getState().syncProjection(PROJECTED, []);
+    store.getState().changeNodes(moving(RESOURCE_B, 340, 20));
+    authoring.complete({
+      kind: 'settled-resource-movement',
+      moved: new Map([[RESOURCE_B, { x: 320, y: 20 }]]),
+    });
+    store.getState().changeNodes(settled(RESOURCE_B, 350, 20));
+    expect(authoring.mapPlacement().get(RESOURCE_B)).toMatchObject({ x: 350, y: 20 });
+  });
+
   it('adds a newly created Resource without placing other omitted Resources', () => {
     const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_RESOURCE_ID));
     store.getState().syncProjection(PROJECTED, []);
@@ -822,22 +912,6 @@ describe('render adapter', () => {
       expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 0, y: 560 });
     });
 
-    it('stores a dragged neighbour it draws aside at its Map position moved by the drag', () => {
-      const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
-      const spy = authoringSpy({ mapPlacement: withNeighbour });
-      const store = createRenderAdapter(spy.authoring);
-      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
-      const drawn = editorPlacement(withNeighbour, store.getState().editors);
-      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
-      store.getState().syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_C, 740, 20)], []);
-
-      completeDrag(store, RESOURCE_C, 745, 20);
-
-      expect(spy.completions).toEqual([
-        { kind: 'settled-resource-movement', moved: new Map([[RESOURCE_C, { x: 405, y: 20 }]]) },
-      ]);
-    });
-
     it('is drawn capped at the visible canvas, which stores nothing', () => {
       const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
         width: 500,
@@ -1009,6 +1083,10 @@ describe('render adapter', () => {
       store.getState().resourceResize.beginResize(RESOURCE_B);
       store.getState().resourceResize.previewResize(RESOURCE_B, { width: 320, height: 220 });
       store.getState().resourceResize.drawEditors(editors, { width: 400, height: 250 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)?.size).toEqual({
+        width: 400,
+        height: 250,
+      });
       store.getState().resourceResize.finishResize(RESOURCE_B);
       expect(spy.completions).toEqual([
         { kind: 'resized-resource', resourceId: RESOURCE_B, size: { width: 320, height: 220 } },
@@ -1026,7 +1104,45 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([]);
     });
 
-    it('caps the preview while storing the size the author requests', () => {
+    it.each([
+      { resource: RESOURCE_A, suggestedSize: undefined, height: 360 },
+      { resource: RESOURCE_B, suggestedSize: { width: 500, height: 600 }, height: 600 },
+      { resource: RESOURCE_B, suggestedSize: undefined, height: 200 },
+    ])(
+      'retains the uncapped height $height when only the drawn width changes',
+      ({ resource, suggestedSize, height }) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        resize.drawEditors(new Map([[resource, suggestedSize ? { suggestedSize } : {}]]), {
+          width: 280,
+          height: 160,
+        });
+        resize.beginResize(resource);
+        resize.previewResize(resource, { width: 265, height: 170 });
+        resize.finishResize(resource);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: resource, editSize: { width: 265, height } },
+        ]);
+      },
+    );
+
+    it.each([400, 200])(
+      'retains the suggested width on a first height-only resize in a %i-wide viewport',
+      (width) => {
+        const spy = authoringSpy({ mapPlacement: authored });
+        const resize = createRenderAdapter(spy.authoring).getState().resourceResize;
+        const suggestedSize = { width: 600, height: 300 };
+        resize.drawEditors(new Map([[RESOURCE_B, { suggestedSize }]]), { width, height: 500 });
+        resize.beginResize(RESOURCE_B);
+        resize.previewResize(RESOURCE_B, { width: Math.max(width, 260), height: 350 });
+        resize.finishResize(RESOURCE_B);
+        expect(spy.completions).toEqual([
+          { kind: 'resized-editor', resourceId: RESOURCE_B, editSize: { width: 600, height: 350 } },
+        ]);
+      },
+    );
+
+    it('stores nothing when an outward resize cannot change the drawn editor', () => {
       const large = Placement.fromEntries([
         [
           RESOURCE_A,
@@ -1055,9 +1171,7 @@ describe('render adapter', () => {
         height: 700,
       });
       store.getState().resourceResize.finishResize(RESOURCE_A);
-      expect(spy.completions).toEqual([
-        { kind: 'resized-editor', resourceId: RESOURCE_A, editSize: { width: 905, height: 705 } },
-      ]);
+      expect(spy.completions).toEqual([]);
     });
   });
 

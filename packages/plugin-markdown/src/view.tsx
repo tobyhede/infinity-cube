@@ -230,6 +230,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         return;
       }
       setRefusal(null);
+      // Compare with the editor’s LF line endings so an unchanged CRLF source stays untouched.
       setEditing({ draft: source, base: lineFeedText(source), saving: false, claim: held });
     },
     [mayAuthor, editing, takeClaim, surface.editSize],

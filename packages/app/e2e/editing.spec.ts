@@ -994,10 +994,11 @@ test('An editor draws its neighbours aside without storing it, and they return w
   await page.mouse.move(handle.x + handle.width / 2 + 100, handle.y + handle.height / 2 + 40, {
     steps: 5,
   });
+  expect(await positionOf(neighbour)).toEqual({ x: 740, y: 300 });
   await page.mouse.up();
   await expect(persistence).toHaveAttribute('data-revision', String(Number(revision) + 1));
   await expect(persistence).toHaveText('Persisted');
-  await expect.poll(async () => (await positionOf(neighbour)).x).toBeGreaterThan(740);
+  await expect.poll(() => positionOf(neighbour)).toEqual({ x: 840, y: 300 });
   await expect(textbox).toBeVisible();
 
   // Saving ends the edit, and the neighbour is drawn where the Map stores it.
