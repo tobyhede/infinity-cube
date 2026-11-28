@@ -398,6 +398,30 @@ mod given_a_server_that_refuses_this_client {
         leaves_unclassified(WRONG_PASSWORD).await;
     }
 
+    // Only a lost primary-key race sends an initialization back to read what
+    // is stored (ADR 0177); any other failure is its answer, asked once.
+    #[tokio::test]
+    async fn answers_an_initialization_it_refuses_without_asking_again() {
+        let server = refusing(WRONG_PASSWORD).await;
+        let store = open(&server.url());
+        let answer = store
+            .initialize_aggregate(AggregateInput {
+                meta_space_id: space(SPACE_ID),
+                spaces: vec![meta()],
+            })
+            .await;
+        store.close().await;
+        assert!(
+            matches!(&answer, Err(RepositoryError::Unclassified(words)) if words.contains(WRONG_PASSWORD.0)),
+            "the refusal is the answer: {answer:?}"
+        );
+        assert_eq!(
+            server.connections(),
+            1,
+            "the database is asked once, not again to read what it holds"
+        );
+    }
+
     // Case: leaves SQLSTATE %s unclassified inside and outside a transaction
     #[tokio::test]
     async fn leaves_no_hba_entry_unclassified_inside_and_outside_a_transaction() {

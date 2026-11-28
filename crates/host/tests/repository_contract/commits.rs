@@ -1154,15 +1154,24 @@ fn graphed_holding(resources: Vec<Value>) -> SpaceSnapshot {
 /// the other, which the commit's Map still places, dropped), then commit
 /// `next` at revision 0. The revision comparison sees nothing, and the
 /// commit stores its whole snapshot, every Resource included, not its
-/// document over the recreated rows.
+/// document over the recreated rows: it writes both Resources the
+/// recreation changed or dropped, which also shows the recreation landed.
 async fn commit_over_recreation<H: Harness>(harness: &mut H, next: &SpaceSnapshot) -> Ran {
     let before = graphed_space(SPACE_ID, "Graphed", [RESOURCE_ID, SECOND_RESOURCE_ID]);
     seed(harness.store().as_ref(), &[&before]).await;
     harness
         .recreate_before_row_lock(graphed_holding(vec![resource(RESOURCE_ID, "Recreated")]))
         .await?;
+    harness.take_resource_writes().await?;
     let result = commit_update(harness.store().as_ref(), next, 0).await;
     assert!(is_committed(&result), "{result:?}");
+    let written = harness.take_resource_writes().await?;
+    assert!(
+        [RESOURCE_ID, SECOND_RESOURCE_ID]
+            .iter()
+            .all(|id| written.iter().any(|write| write == id)),
+        "the commit writes the Resource rows the recreation changed and dropped: {written:?}"
+    );
     let store = reopened(harness).await;
     assert_same!(load(store, SPACE_ID).await, Some(stored(next, 1, None)));
     Ok(())

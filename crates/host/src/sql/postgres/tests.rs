@@ -604,6 +604,19 @@ mod read_sslmode_as_pg_does {
         }
     }
 
+    // pg-connection-string 2.14 reads a non-empty `sslcert` and `sslkey` as
+    // the client's certificate and key files, so `sqlx` is handed both.
+    #[test]
+    fn hands_a_named_client_certificate_and_key_to_sqlx() {
+        let url = format!("{BASE}?sslcert=/client.pem&sslkey=/client.key");
+        let described = format!("{:?}", connect_options(&url, None).unwrap());
+        assert!(
+            described.contains("ssl_client_cert: Some(File(\"/client.pem\"))")
+                && described.contains("ssl_client_key: Some(File(\"/client.key\"))"),
+            "{url} names both files to sqlx: {described}"
+        );
+    }
+
     // `pg` reads the last of a repeated parameter, so an empty last
     // `sslcert` or `sslkey` is absent however many came before it, and
     // `sqlx`, which applies each in turn, is handed none of them.
@@ -710,5 +723,22 @@ mod read_sslmode_as_pg_does {
             connect_options("not a url", None),
             Err(PostgresUrlError::Invalid(_))
         ));
+    }
+}
+
+mod describe_the_repository {
+    use super::super::super::DatabaseUrl;
+    use super::super::PostgresSpaceRepository;
+
+    // Opening connects to nothing, so no server is needed.
+    #[tokio::test]
+    async fn names_the_store_it_runs_over() {
+        let url = DatabaseUrl::parse(Some("postgresql://cube@127.0.0.1:55432/cube")).unwrap();
+        let repository = PostgresSpaceRepository::open(&url).unwrap();
+        let described = format!("{repository:?}");
+        assert!(
+            described.contains("Shared { store: PostgresStore { pool: "),
+            "the repository describes its store: {described}"
+        );
     }
 }

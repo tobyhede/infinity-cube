@@ -463,6 +463,55 @@ mod given_a_candidate_aggregate_intake_refuses {
     }
 }
 
+/// ADR 0095: the stored aggregate already refuses an ordinary Space nothing
+/// references, which a commit leaving it alone is not refused for.
+mod given_a_stored_space_nothing_references {
+    use super::*;
+
+    const NEW: &str = "10000000-0000-4000-8000-000000000004";
+
+    /// [`two_spaces`] and a third Space nothing references.
+    fn with_an_orphan() -> Vec<LoadedSpace> {
+        let mut spaces = two_spaces();
+        spaces.push(stored(plain(OTHER, "Orphan"), 3));
+        spaces
+    }
+
+    #[test]
+    fn writes_an_edit_that_leaves_it_alone() {
+        let decision = decide_commit(
+            &commit(vec![update(plain(CHILD, "Renamed"), 3)]),
+            Some(id(META)),
+            &with_an_orphan(),
+        );
+        assert!(
+            matches!(decision, CommitDecision::Write { .. }),
+            "the stored orphan is forgiven: {decision:?}"
+        );
+    }
+
+    #[test]
+    fn refuses_only_the_space_the_commit_itself_leaves_unreferenced() {
+        let change = SpaceChange::Create {
+            space_id: id(NEW),
+            snapshot: plain(NEW, "New"),
+        };
+        let result = answer(decide_commit(
+            &commit(vec![change]),
+            Some(id(META)),
+            &with_an_orphan(),
+        ));
+        let CommitResult::AggregateRefused(refusal) = result else {
+            panic!("expected a refusal, got {result:?}");
+        };
+        assert_eq!(
+            refusal.refusals,
+            vec![Refusal::OrdinarySpaceUnreferenced { space: id(NEW) }],
+            "the stored orphan is forgiven, the created one is not"
+        );
+    }
+}
+
 mod given_a_resource_of_a_missing_kind {
     use super::*;
 
