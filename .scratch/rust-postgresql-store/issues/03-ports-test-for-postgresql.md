@@ -13,3 +13,9 @@
 - [ ] Four exemption kinds: **pending** (names the ticket in `case-map.md`), **does not apply** (names the reason from `spec.md`'s "Does not apply on PostgreSQL"), **owned elsewhere** (names the rust-host ticket that ports it: 16 for the two migration-history cases, 17 and 26 for the eight CLI import and export cases) and **accepted difference** (names the decision: change order; `EAI_AGAIN`, one value of `sql-connection-failure.test.ts:144`; the two `prisma-postgres-env-path.test.ts` cases about where the search starts, Q7). It fails on a case or value with neither port nor exemption, on a mark or exemption naming no case, and on a case both ported and exempt.
 
 **Named mutants (on the ports test itself, each must fail its own unit tests, as the HTTP ports test's are):** reading names across describes (the duplicate goes unnoticed); dropping `describe.each` values; treating an accepted difference as a port; leaving an exempt case out of the adapter instead of listing it as an exemption (an exempt case's name dropped from the adapter must fail).
+
+## Comments
+
+**2026-11-28, implement-tickets run.** Built on PR #559 (`feat/rust-postgresql-store-03-ports-test-for-postgresql`, based on 02's branch, head `5dda88a7`). Every acceptance criterion is met by the build's own account, and `CI passed` is green. Review findings fixed in round 1 and confirmed by the audit: each per-value case's listed values are compared with its table (`misvalued`); `case-names.ts` treats `%#` and `%$` as row-index substitutes; and a lineage comment was removed. Nothing is open. What remains is the maintainer's: merge after #557. Do not rebuild this ticket. #561 (06) is based on this branch.
+
+A follow-up outside this ticket's scope: the audit noted that SQLite's adapter has the same gap the `misvalued` check closes here, so a value added to a SQLite `VALUES` table is not caught. It needs its own ticket.

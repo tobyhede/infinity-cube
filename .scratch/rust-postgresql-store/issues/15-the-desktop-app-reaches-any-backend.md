@@ -1,8 +1,8 @@
 # 15 — The desktop application opens a Space from any backend
 
-**Status:** needs-decision (an ADR first)
+**Status:** ready-for-agent (ADR 0181 accepted 28 November 2026)
 
-**Blocked by:** none for the ADR. The build waits on 06, so the PostgreSQL repository it opens holds the whole contract.
+**Blocked by:** 06, so the PostgreSQL repository it opens holds the whole contract. The ADR it waited on is accepted (ADR 0181, PR #562).
 
 **Why:** The desktop application should be able to reach any backend, not only an Aggregate directory. Today it opens a folder and nothing else: ST-121 and ST-131 in `docs/requirements/storage.md`, ADR 0155 and ADR 0171. The Rust host it embeds (`crates/host`) already has a memory store, a SQLite repository and, from this plan, a PostgreSQL repository, and every one of them is compiled into the shell (PR 541 keeps the `sqlx` `postgres` and TLS features on `host` for every program, on purpose). What is missing is a way to choose one, and a window served from it.
 
@@ -23,3 +23,9 @@
 - [ ] Tests: the scheme handler over the SQLite and PostgreSQL repositories, run against the HTTP conformance table as `src/scheme/tests.rs` runs it over a folder, with the PostgreSQL tests ignored by default and run in the `rust` job as the other `postgres*` binaries are.
 
 **Named mutants:** none yet. The ADR settles the behaviour they would target.
+
+## Comments
+
+**2026-11-28, implement-tickets run.** The run's build of this ticket wrote the ADR and stopped, because the build items wait for it. The maintainer accepted it as ADR 0181 on 28 November 2026 (PR #562), settling four points: a hosted InfinityCube is out of scope; the shell stores no password, not even in a keychain; the shell neither creates a SQLite file nor migrates a database; and one PostgreSQL database reached by two host names gets two origins. Build to ADR 0181's text. Its Consequences section names the code it touches: `src/scheme.rs`'s `AggregateApplication`, `InFlight::settled`, and the recent history and reopen set (ST-131, not yet built).
+
+The run's branch `feat/rust-postgresql-store-15-the-desktop-app-reaches-any-backend` (`044d0cfb`) holds only the proposed ADR on top of 06's work. It is superseded by #562 and can be deleted. Start the build from 06's branch, or from `main` once 06 has merged, with #562 merged in.

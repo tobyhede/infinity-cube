@@ -12,3 +12,7 @@
 - [ ] Findings become tickets; this plan is closed only when none is a correctness gap.
 
 **Named mutants:** none of its own; it makes fresh ones by design.
+
+## Comments
+
+**2026-11-28, implement-tickets run.** Not started. It waits on 13.
