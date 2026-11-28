@@ -142,6 +142,10 @@ Full-application stories mount `components/Application.tsx`. `stories/support/ap
 
 Exercise refusals through production gestures. If a refusal cannot be reached through a browser gesture, hand the story its structured refusal and declare the claim's `applicationEvidence` exemption; do not inject display prose through a callback. `stories/support` is catalogue furniture: use `inv-*` styling and mount the production surface rather than imitating its classes.
 
+## Reviewing agent documentation
+
+Ask “What will an agent do differently after reading this, and where does that instruction belong?” For example, a Space chrome change sends the agent from the root instructions to the verification guide. The guide explains why to inspect the database restart proofs as well as the ordinary browser specs. The package scripts own the commands those proofs run.
+
 ## What a comment may assert
 
 Assert only what the writer has checked. A subagent summary is a report to verify against the file before turning it into source prose.

@@ -15,13 +15,17 @@ hyphens, duplicates suffixed -1, -2 ...).
 Run from the repository root:  python3 .scratch/requirements-rewrite/check-links.py
 Exits non-zero and lists each broken link.
 """
+import argparse
 import os
 import re
 import subprocess
 import sys
 
-root = sys.argv[1] if len(sys.argv) > 1 else "."
-os.chdir(root)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("root", nargs="?", default=".")
+parser.add_argument("--agent-docs", action="store_true", help="Check only AGENTS.md and docs/agents/")
+args = parser.parse_args()
+os.chdir(args.root)
 
 listed = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.md"]).decode().split("\n")
 adr_body = re.compile(r"^docs/adr/(superseded/)?\d{4}-")
@@ -33,6 +37,9 @@ files = sorted(
     and (f.startswith(("docs/", ".agents/skills/", "plugins/")) or f in ("AGENTS.md", "CONTEXT.md", "README.md", "CLAUDE.md"))
     and not adr_body.match(f)
 )
+
+if args.agent_docs:
+    files = [f for f in files if f == "AGENTS.md" or f.startswith("docs/agents/")]
 
 anchor_cache = {}
 
