@@ -344,6 +344,29 @@ struct Shared<S> {
     store: S,
     #[cfg(any(test, feature = "test-support"))]
     probe: std::sync::Mutex<Option<Probe>>,
+    #[cfg(any(test, feature = "test-support"))]
+    instruments: std::sync::Mutex<Instruments>,
+}
+
+/// What a test has the repository record or do beyond its probe.
+#[cfg(any(test, feature = "test-support"))]
+#[derive(Debug, Default)]
+struct Instruments {
+    /// Every Resource id an operation has asked the store to write a row
+    /// for since the last take, in the order asked.
+    resource_writes: Vec<String>,
+    /// The Space whose Resource rows the next commit writing it replaces
+    /// with these, before its row lock.
+    recreation: Option<SpaceSnapshot>,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl<S> Shared<S> {
+    fn instruments(&self) -> std::sync::MutexGuard<'_, Instruments> {
+        self.instruments
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
 }
 
 impl<S: std::fmt::Debug> std::fmt::Debug for Shared<S> {
@@ -392,6 +415,8 @@ impl<S> SqlSpaceRepository<S> {
                 store,
                 #[cfg(any(test, feature = "test-support"))]
                 probe: std::sync::Mutex::new(None),
+                #[cfg(any(test, feature = "test-support"))]
+                instruments: std::sync::Mutex::default(),
             }),
             gate: Arc::new(tokio::sync::RwLock::new(())),
         }
@@ -416,6 +441,26 @@ impl<S> SqlSpaceRepository<S> {
             .probe
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = probe;
+    }
+
+    /// Every Resource id an operation has asked the store to write a row
+    /// for (to insert or upsert) since the last call, in the order asked,
+    /// including a write its transaction later rolled back
+    /// (`recordResourceWrites`).
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn take_resource_writes(&self) -> Vec<String> {
+        std::mem::take(&mut self.shared.instruments().resource_writes)
+    }
+
+    /// Have the next commit writing `snapshot`'s Space first replace that
+    /// Space's Resource rows with `snapshot`'s, in that commit's transaction,
+    /// after its read and before it takes the Space's row lock: the rows a
+    /// replacement recreating the Space at the revision the commit expects
+    /// would leave (`recreatingBeforeRowLock`). These writes are not
+    /// recorded as the repository's own.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn recreate_before_row_lock(&self, snapshot: SpaceSnapshot) {
+        self.shared.instruments().recreation = Some(snapshot);
     }
 }
 
@@ -488,6 +533,78 @@ impl<S: SqlStore> Shared<S> {
         }
         #[cfg(not(any(test, feature = "test-support")))]
         let _ = step;
+    }
+
+    /// Record that the store is asked to write `resource`'s row, where a test
+    /// records Resource writes. Only [`Self::insert_resource`] and
+    /// [`Self::upsert_resource`] call it.
+    fn writing_resource(&self, resource: &ResourceRow) {
+        #[cfg(any(test, feature = "test-support"))]
+        self.instruments().resource_writes.push(resource.id.clone());
+        #[cfg(not(any(test, feature = "test-support")))]
+        let _ = resource;
+    }
+
+    /// Insert `resource`'s row, recording the write. Every repository insert
+    /// of a Resource row goes through here:
+    /// `test/unit/repository-contract-rust-ports.test.ts`
+    /// ("asks the store to write a Resource row only where the write is
+    /// recorded") holds that.
+    async fn insert_resource(
+        &self,
+        connection: &mut Connection<S>,
+        resource: &ResourceRow,
+    ) -> Result<(), sqlx::Error> {
+        self.writing_resource(resource);
+        S::insert_resource(connection, resource).await
+    }
+
+    /// Insert or update `resource`'s row, recording the write, and answer
+    /// the Space the row then belongs to. Every repository upsert of a
+    /// Resource row goes through here:
+    /// `test/unit/repository-contract-rust-ports.test.ts`
+    /// ("asks the store to write a Resource row only where the write is
+    /// recorded") holds that.
+    async fn upsert_resource(
+        &self,
+        connection: &mut Connection<S>,
+        resource: &ResourceRow,
+    ) -> Result<String, sqlx::Error> {
+        self.writing_resource(resource);
+        S::upsert_resource(connection, resource).await
+    }
+
+    /// Replace Space `id`'s Resource rows on `connection` with those a test
+    /// asked to be recreated before this Space's row lock, if it asked.
+    async fn recreate_before_row_lock(
+        &self,
+        connection: &mut Connection<S>,
+        id: SpaceId,
+    ) -> Outcome<()> {
+        #[cfg(any(test, feature = "test-support"))]
+        {
+            let recreation = {
+                let mut instruments = self.instruments();
+                match &instruments.recreation {
+                    Some(snapshot) if snapshot.id == id => instruments.recreation.take(),
+                    _ => None,
+                }
+            };
+            if let Some(snapshot) = recreation {
+                let (row, resources) = encode_space(&LoadedSpace {
+                    snapshot,
+                    revision: Revision::FIRST,
+                    exported_revision: None,
+                });
+                S::delete_resources_except(connection, &row.id, &[]).await?;
+                for resource in &resources {
+                    S::insert_resource(connection, resource).await?;
+                }
+            }
+        }
+        #[cfg(not(any(test, feature = "test-support")))]
+        let _ = (connection, id);
+        Ok(())
     }
 
     /// A transaction begun as `access` asks, over the database first opened,
@@ -613,7 +730,7 @@ impl<S: SqlStore> Shared<S> {
             let (row, resources) = encode_space(space);
             S::insert_space(connection, &row).await?;
             for resource in &resources {
-                S::insert_resource(connection, resource).await?;
+                self.insert_resource(connection, resource).await?;
             }
         }
         S::insert_meta_space_id(connection, input.meta_space_id.as_str()).await?;
@@ -668,6 +785,7 @@ impl<S: SqlStore> Shared<S> {
             .collect();
         for (id, _, _) in encoded.iter().filter(|(_, created, _)| !created) {
             self.reached(Step::RowLock(*id)).await;
+            self.recreate_before_row_lock(connection, *id).await?;
             let prior = self
                 .store
                 .lock_space(connection, id.as_str().as_bytes(), IdStorage::Text)
@@ -698,7 +816,7 @@ impl<S: SqlStore> Shared<S> {
         }
         for (id, created, (row, resources)) in &encoded {
             let written = if *created {
-                write_created::<S>(connection, row, resources).await?
+                self.write_created(connection, row, resources).await?
             } else {
                 self.write_updated(connection, *id, row, resources).await?
             };
@@ -738,7 +856,7 @@ impl<S: SqlStore> Shared<S> {
             if unchanged {
                 continue;
             }
-            let owner = S::upsert_resource(connection, resource).await?;
+            let owner = self.upsert_resource(connection, resource).await?;
             if owner != row.id {
                 return Ok(Err(Landing::Refused(format!(
                     "Resource {} belongs to space {owner}, not {}",
@@ -1038,27 +1156,30 @@ fn vanished(message: String) -> Failure {
     Failure::Answered(RepositoryError::Unclassified(message))
 }
 
-/// Insert a created Space's row and every Resource row it holds, refusing
-/// a Resource whose id a row already holds.
-async fn write_created<S: SqlStore>(
-    connection: &mut Connection<S>,
-    row: &SpaceRow,
-    resources: &[ResourceRow],
-) -> Outcome<Result<(), Landing>> {
-    S::insert_space(connection, row).await?;
-    for resource in resources {
-        match S::insert_resource(connection, resource).await {
-            Ok(()) => {}
-            Err(error) if unique_violation(&error) => {
-                return Ok(Err(Landing::Refused(format!(
-                    "Resource {} already belongs to another space",
-                    resource.id
-                ))));
+impl<S: SqlStore> Shared<S> {
+    /// Insert a created Space's row and every Resource row it holds, refusing
+    /// a Resource whose id a row already holds.
+    async fn write_created(
+        &self,
+        connection: &mut Connection<S>,
+        row: &SpaceRow,
+        resources: &[ResourceRow],
+    ) -> Outcome<Result<(), Landing>> {
+        S::insert_space(connection, row).await?;
+        for resource in resources {
+            match self.insert_resource(connection, resource).await {
+                Ok(()) => {}
+                Err(error) if unique_violation(&error) => {
+                    return Ok(Err(Landing::Refused(format!(
+                        "Resource {} already belongs to another space",
+                        resource.id
+                    ))));
+                }
+                Err(error) => return Err(error.into()),
             }
-            Err(error) => return Err(error.into()),
         }
+        Ok(Ok(()))
     }
-    Ok(Ok(()))
 }
 
 impl<S: SqlStore> SpaceRepository for SqlSpaceRepository<S> {

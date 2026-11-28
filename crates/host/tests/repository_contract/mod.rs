@@ -117,9 +117,18 @@ pub trait Harness: Sized {
         exported: Option<Option<&str>>,
     ) -> Result<(), Unprovided>;
 
-    /// Every Resource id the store has written a row for since the last
-    /// call, in the order written.
+    /// Every Resource id the repository has asked the store to write a row
+    /// for (to insert or upsert) since the last call, in the order asked,
+    /// including a write its transaction later rolled back
+    /// (`recordResourceWrites`).
     async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided>;
+
+    /// Replace `snapshot`'s Space's Resource rows with `snapshot`'s inside
+    /// the next commit that writes that Space, after the commit's read and
+    /// before its row lock, in the commit's own transaction
+    /// (`recreateBeforeRowLock`).
+    async fn recreate_before_row_lock(&mut self, snapshot: SpaceSnapshot)
+    -> Result<(), Unprovided>;
 
     /// Close the store.
     async fn close(self);
@@ -428,10 +437,24 @@ pub fn refused_kinds(result: &CommitResult) -> Vec<&'static str> {
 
 /// One test per case of the table, in a module `contract`, each opening a
 /// fresh `$harness`, running the case, and closing it. A case that needs
-/// what the harness cannot provide says it was skipped and why.
+/// what the harness cannot provide says it was skipped and why; under
+/// `repository_cases!($harness, every_member)` it fails instead, for a store
+/// whose every `// Case:` line must port a case that runs on it.
 macro_rules! repository_cases {
     ($harness:ty) => {
-        repository_cases! { @emit $harness;
+        repository_cases! { @table $harness; skip }
+    };
+    ($harness:ty, every_member) => {
+        repository_cases! { @table $harness; every_member }
+    };
+    (@unprovided skip, $why:expr) => {
+        eprintln!("skipped: {}", $why)
+    };
+    (@unprovided every_member, $why:expr) => {
+        panic!("the harness must provide every member, but: {}", $why)
+    };
+    (@table $harness:ty; $mode:ident) => {
+        repository_cases! { @emit $harness; $mode;
             // table:begin
             lifecycle {
                 preserves_the_established_aggregate_across_a_fresh_host,
@@ -490,6 +513,8 @@ macro_rules! repository_cases {
                 keeps_an_exported_revision_through_an_aggregate_commit,
                 answers_a_stale_revision_on_the_aggregate_path_as_a_conflict,
                 adopts_a_resource_id_from_the_space_a_commit_deletes,
+                stores_a_topology_preserving_commits_whole_snapshot_over_recreated_resource_rows,
+                stores_a_complete_aggregate_commits_whole_snapshot_over_recreated_resource_rows,
             }
             broken {
                 replaces_an_invalid_space_document,
@@ -526,7 +551,7 @@ macro_rules! repository_cases {
             // table:end
         }
     };
-    (@emit $harness:ty; $($group:ident { $($case:ident),* $(,)? })*) => {
+    (@emit $harness:ty; $mode:ident; $($group:ident { $($case:ident),* $(,)? })*) => {
         mod contract {
             #[allow(unused_imports, reason = "the harness may be named by a path")]
             use super::*;
@@ -545,7 +570,7 @@ macro_rules! repository_cases {
                                 $crate::repository_contract::$group::$case(&mut harness).await;
                             harness.close().await;
                             if let Err($crate::repository_contract::Unprovided(why)) = ran {
-                                eprintln!("skipped: {why}");
+                                $crate::repository_contract::repository_cases!(@unprovided $mode, why);
                             }
                         }
                     )*

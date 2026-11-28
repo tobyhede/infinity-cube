@@ -1132,3 +1132,65 @@ pub async fn adopts_a_resource_id_from_the_space_a_commit_deletes<H: Harness>(
     assert_eq!(load(store, OTHER_SPACE_ID).await, None);
     Ok(())
 }
+
+/// The Space the recreation cases seed, one Map placing two Resources and
+/// its Graph an Edge between them, holding `resources`.
+fn graphed_holding(resources: Vec<Value>) -> SpaceSnapshot {
+    let mut value = graphed_value(
+        SPACE_ID,
+        "Graphed",
+        [RESOURCE_ID, SECOND_RESOURCE_ID],
+        MAP_ID,
+        GRAPH_ID,
+        "Graph",
+    );
+    value["resources"] = Value::Array(resources);
+    snapshot(SPACE_ID, &value)
+}
+
+/// Seed the graphed Space, have the store recreate its Resource rows before
+/// the next commit's row lock as a replacement recreating it at revision 0
+/// would leave them (the Resource the commit leaves as it read it changed,
+/// the other, which the commit's Map still places, dropped), then commit
+/// `next` at revision 0. The revision comparison sees nothing, and the
+/// commit stores its whole snapshot, every Resource included, not its
+/// document over the recreated rows.
+async fn commit_over_recreation<H: Harness>(harness: &mut H, next: &SpaceSnapshot) -> Ran {
+    let before = graphed_space(SPACE_ID, "Graphed", [RESOURCE_ID, SECOND_RESOURCE_ID]);
+    seed(harness.store().as_ref(), &[&before]).await;
+    harness
+        .recreate_before_row_lock(graphed_holding(vec![resource(RESOURCE_ID, "Recreated")]))
+        .await?;
+    let result = commit_update(harness.store().as_ref(), next, 0).await;
+    assert!(is_committed(&result), "{result:?}");
+    let store = reopened(harness).await;
+    assert_eq!(load(store, SPACE_ID).await, Some(stored(next, 1, None)));
+    Ok(())
+}
+
+// Case: stores a * commit's whole snapshot over Resource rows recreated before its row lock (topology-preserving)
+pub async fn stores_a_topology_preserving_commits_whole_snapshot_over_recreated_resource_rows<
+    H: Harness,
+>(
+    harness: &mut H,
+) -> Ran {
+    let next = retitled(
+        &graphed_space(SPACE_ID, "Graphed", [RESOURCE_ID, SECOND_RESOURCE_ID]),
+        "Committed",
+    );
+    commit_over_recreation(harness, &next).await
+}
+
+// Case: stores a * commit's whole snapshot over Resource rows recreated before its row lock (complete-aggregate)
+pub async fn stores_a_complete_aggregate_commits_whole_snapshot_over_recreated_resource_rows<
+    H: Harness,
+>(
+    harness: &mut H,
+) -> Ran {
+    let next = graphed_holding(vec![
+        resource(RESOURCE_ID, "From"),
+        resource(SECOND_RESOURCE_ID, "To"),
+        resource(OTHER_RESOURCE_ID, "Added"),
+    ]);
+    commit_over_recreation(harness, &next).await
+}

@@ -16,24 +16,16 @@ mod sqlite_support;
 use std::sync::Arc;
 
 use host::SqliteSpaceRepository;
-use intake::SpaceId;
+use intake::{SpaceId, SpaceSnapshot};
 use repository_contract::{BrokenState, Harness, Unprovided, repository_cases};
-use sqlite_support::{Migrated, connect, execute};
-
-/// Every Resource row the store inserts or updates, in the order written,
-/// recorded by triggers inside the writing transaction, so a write a
-/// rollback undoes is not recorded.
-const RECORD_RESOURCE_WRITES: &str = r#"
-CREATE TABLE "contract_resource_writes" ("seq" INTEGER PRIMARY KEY AUTOINCREMENT, "id" TEXT NOT NULL);
-CREATE TRIGGER "contract_resource_inserted" AFTER INSERT ON "resources"
-  BEGIN INSERT INTO "contract_resource_writes" ("id") VALUES (NEW."id"); END;
-CREATE TRIGGER "contract_resource_updated" AFTER UPDATE ON "resources"
-  BEGIN INSERT INTO "contract_resource_writes" ("id") VALUES (NEW."id"); END;
-"#;
+use sqlite_support::{Migrated, execute};
 
 struct Sqlite {
     file: Migrated,
     store: Arc<SqliteSpaceRepository>,
+    /// The Resource writes a store closed by a reopen recorded and no call
+    /// has taken yet.
+    written: Vec<String>,
 }
 
 /// `value` as an SQL string literal.
@@ -46,9 +38,12 @@ impl Harness for Sqlite {
 
     async fn open() -> Self {
         let file = Migrated::new().await;
-        execute(&file.file, RECORD_RESOURCE_WRITES).await;
         let store = Arc::new(SqliteSpaceRepository::open(&file.path()));
-        Self { file, store }
+        Self {
+            file,
+            store,
+            written: Vec::new(),
+        }
     }
 
     fn store(&self) -> &Arc<Self::Store> {
@@ -57,6 +52,7 @@ impl Harness for Sqlite {
 
     async fn reopen(&mut self) -> Result<(), Unprovided> {
         self.store.close().await;
+        self.written.extend(self.store.take_resource_writes());
         self.store = Arc::new(SqliteSpaceRepository::open(&self.file.path()));
         Ok(())
     }
@@ -122,18 +118,17 @@ impl Harness for Sqlite {
     }
 
     async fn take_resource_writes(&mut self) -> Result<Vec<String>, Unprovided> {
-        let mut connection = connect(&self.file.file).await;
-        let written: Vec<String> =
-            sqlx::query_scalar(r#"SELECT "id" FROM "contract_resource_writes" ORDER BY "seq""#)
-                .fetch_all(&mut connection)
-                .await
-                .unwrap();
-        sqlx::raw_sql(r#"DELETE FROM "contract_resource_writes""#)
-            .execute(&mut connection)
-            .await
-            .unwrap();
-        sqlx::Connection::close(connection).await.unwrap();
+        let mut written = std::mem::take(&mut self.written);
+        written.extend(self.store.take_resource_writes());
         Ok(written)
+    }
+
+    async fn recreate_before_row_lock(
+        &mut self,
+        snapshot: SpaceSnapshot,
+    ) -> Result<(), Unprovided> {
+        self.store.recreate_before_row_lock(snapshot);
+        Ok(())
     }
 
     async fn close(self) {
@@ -141,4 +136,4 @@ impl Harness for Sqlite {
     }
 }
 
-repository_cases!(super::Sqlite);
+repository_cases!(super::Sqlite, every_member);
