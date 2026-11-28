@@ -1,6 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -433,7 +443,11 @@ describe('release/install.sh', () => {
   });
 
   it('installs to, and names, the absolute folder a relative INFINITY_CUBE_INSTALL_DIR means', async () => {
-    const root = await temporaryDirectory();
+    const directory = await temporaryDirectory();
+    const home = join(directory, 'home');
+    const root = join(directory, 'home-link');
+    await mkdir(home);
+    await symlink(home, root);
     const served = await fakeRelease(root, targets);
 
     const run = install(realPath, root, {
@@ -443,9 +457,10 @@ describe('release/install.sh', () => {
     });
 
     expect(run.status).toBe(0);
-    expect(await readdir(join(root, 'bin'))).toEqual(['infinity-cube']);
-    expect(run.stdout).toContain(`to ${join(root, 'bin', 'infinity-cube')}\n`);
-    expect(run.stdout).toContain(`export PATH="${join(root, 'bin')}:$PATH"`);
+    const installDir = join(await realpath(home), 'bin');
+    expect(await readdir(installDir)).toEqual(['infinity-cube']);
+    expect(run.stdout).toContain(`to ${join(installDir, 'infinity-cube')}\n`);
+    expect(run.stdout).toContain(`export PATH="${installDir}:$PATH"`);
   });
 
   it('prints the line that adds the install folder to PATH when PATH lacks it', async () => {
