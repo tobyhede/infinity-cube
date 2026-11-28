@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
 import type { Space } from '@project/graph';
-// Through the package's own subpath imports, as `#components/*` already is: a
-// story sits two directories above `src`, and climbing there by relative path is
-// how a package boundary gets crossed without naming one (AGENTS.md).
+// App stories reach source through package subpaths (docs/agents/architecture.md, "Import enforcement").
 import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
 import { PresentingChrome } from '#components/PresentingChrome';
