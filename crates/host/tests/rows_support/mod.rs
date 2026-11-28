@@ -11,7 +11,7 @@ use host::{
     StoredAsset, decode_commit,
 };
 use intake::json::{JsonValue, parse};
-use intake::{Placement, Size, SpaceId};
+use intake::{Size, SpaceId};
 
 /// The repository's root directory.
 pub fn repository_root() -> PathBuf {
@@ -259,17 +259,24 @@ async fn assert_holds_what_the_script_names<R: SpaceRepository>(store: &R) {
         map.positions
             .iter()
             .find(|(id, _)| id.as_str() == CHART)
-            .map(|(_, placement)| placement),
-        Some(&Placement {
-            x: 0.0,
-            y: 300.0,
-            size: Some(Size {
+            .map(|(_, placement)| (
+                placement.x,
+                placement.y,
+                placement.size,
+                placement.edit_size,
+                &placement.content
+            )),
+        Some((
+            0.0,
+            300.0,
+            Some(Size {
                 width: 320.0,
                 height: 180.0,
             }),
-            content: Some(parse(r#"{"zoom":2}"#).unwrap()),
-        }),
-        "the placement with a size and Map content"
+            None,
+            &Some(parse(r#"{"zoom":2}"#).unwrap()),
+        )),
+        "the chart's position, size, absent Edit size and Map content"
     );
     assert_eq!(
         map.graphs[0]
