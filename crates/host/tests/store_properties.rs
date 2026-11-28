@@ -31,7 +31,7 @@ mod sqlite_support;
 use std::collections::BTreeSet;
 
 use commit_sequences::{
-    Case, Expected, Fixed, KeyOrder, Start, Step, Unlinking, compare_final, compare_steps, initial,
+    Case, Expected, Fixed, KeyOrder, Referrers, Start, Step, compare_final, compare_steps, initial,
     memory_at, reordered, revision_statement, start_revisions,
 };
 use host::SqliteSpaceRepository;
@@ -96,12 +96,12 @@ async fn the_generated_steps_reach_every_kind_of_answer() {
         },
         Step::Create {
             space: 2,
-            linked: false,
+            from_meta: false,
             meta_first: false,
         },
         Step::Create {
             space: 2,
-            linked: true,
+            from_meta: true,
             meta_first: true,
         },
         Step::Move {
@@ -112,7 +112,7 @@ async fn the_generated_steps_reach_every_kind_of_answer() {
         },
         Step::Delete {
             space: 1,
-            unlinking: Unlinking::Dropped,
+            referrers: Referrers::Dropped,
             updates_first: false,
             revision: Expected::Current,
         },
@@ -155,15 +155,17 @@ async fn the_map_internal_and_ceiling_steps_reach_the_answers_they_exist_for() {
     .await;
 }
 
-/// The TypeScript differential's scenarios that need no link or ceiling
-/// each make the answer that scenario exists to reach.
+/// The TypeScript differential's scenarios that need no Space Resource
+/// added, no deletion and no ceiling each make the answer that scenario
+/// exists to reach.
 #[tokio::test]
 async fn the_scenario_steps_reach_the_answers_they_exist_for() {
     assert_reaches(commit_sequences::scenario_steps(), "the scenario steps").await;
 }
 
-/// Run `fixed` on the memory store and on SQLite, comparing every answer and
-/// the final aggregate, and assert that each step made the answer it exists
+/// Run `fixed` on the memory store and on SQLite, comparing every answer,
+/// the aggregate each holds after every step and the final aggregate, and
+/// assert that each step made the answer it exists
 /// to reach: a step that made no commit, or a different answer on both,
 /// fails here rather than passing as agreement.
 async fn assert_reaches(fixed: Fixed, sequence: &str) {
@@ -175,20 +177,36 @@ async fn assert_reaches(fixed: Fixed, sequence: &str) {
     );
 }
 
-/// The linking and deletion steps make the answers the TypeScript
-/// differential's deletion scenarios exist to reach: an ordinary Space links
-/// another; deleting a Space two Spaces link, alone, is a conflict
-/// ("partial-deletion"); deleting it while each Space linking it changes but
-/// keeps its link is refused ("incomplete-deletion-proposal"); deleting it
-/// while each drops its link, Meta and an ordinary Space both, commits
-/// ("complete-deletion"); and a link to a Space no longer stored is refused.
+/// Giving an ordinary Space a Space Resource referring to another, and
+/// deleting a Space Meta and an ordinary Space refer to with the Spaces
+/// referring to it untouched, retitled or dropping their Space Resources,
+/// make the answers `reference_and_deletion_steps` names.
 #[tokio::test]
-async fn the_linking_and_deletion_steps_reach_the_answers_they_exist_for() {
+async fn the_reference_and_deletion_steps_reach_the_answers_they_exist_for() {
     assert_reaches(
-        commit_sequences::linking_and_deletion_steps(),
-        "the linking and deletion steps",
+        commit_sequences::reference_and_deletion_steps(),
+        "the reference and deletion steps",
     )
     .await;
+}
+
+/// The TypeScript differential's "partial-deletion",
+/// "incomplete-deletion-proposal" and "complete-deletion", on a Space three
+/// ordinary Spaces refer to, make the answers each exists to reach.
+#[tokio::test]
+async fn the_deletion_scenarios_reach_the_answers_they_exist_for() {
+    assert_reaches(
+        commit_sequences::deletion_from_several_parents_steps(),
+        "the deletion scenarios",
+    )
+    .await;
+}
+
+/// An Export recorded for a Space is kept as later commits rewrite its row,
+/// on memory and SQLite alike.
+#[tokio::test]
+async fn the_export_steps_reach_the_answers_they_exist_for() {
+    assert_reaches(commit_sequences::export_steps(), "the export steps").await;
 }
 
 /// `reordered` lists two or more Resources out of ascending order for every
