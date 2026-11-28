@@ -270,6 +270,31 @@ describe('the Mermaid plugin’s view', () => {
     }
   });
 
+  it('abandons an edit still measuring when it is Closed, so a later Open begins none', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const stalled = mermaidPluginViewWith(() => new Promise<never>(() => undefined));
+      const rendered = renderPlugin(stalled.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'graph TD' }),
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
+      await screen.findByRole('button', { name: 'Close Resource Notes' });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+      expect(screen.queryByRole('textbox', { name: 'Mermaid source of Notes' })).toBeNull();
+      expect(rendered.commits.claims.inPlace).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says a failure Mermaid gives no words for in its own', async () => {
     const silent = mermaidPluginViewWith(() => Promise.reject(new Error(' ')));
     renderPlugin(silent.View, {

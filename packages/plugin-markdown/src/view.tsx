@@ -294,8 +294,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
 
   const end = useCallback(() => setEditing(null), []);
 
-  // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
+  // A Resource Closed elsewhere while its draft was up has nowhere to draw it,
+  // and one Closed while its edit was still being measured begins no edit, so
+  // a later Open begins none until Edit is pressed again.
   if (editing !== null && !open) setEditing(null);
+  if (measuring && !open) setMeasuring(false);
 
   // An Edit asked for while Closed begins once the Open it caused has landed
   // and the text is read, and where the text cannot be read says it cannot.

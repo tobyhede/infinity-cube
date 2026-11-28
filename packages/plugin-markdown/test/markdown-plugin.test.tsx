@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { EMPTY_ASSET, lineFeedText, type AssetRef } from '@project/resource-api/domain';
 import { renderPlugin } from '@project/resource-api/view/testing';
 import {
@@ -141,6 +141,37 @@ describe('the Markdown plugin’s view', () => {
     await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
     expect(rendered.commits.claims.inPlace).toHaveLength(2);
     expect(rendered.commits.claims.inPlace[1]?.sizeHint?.width).toBe(READING_WIDTH);
+  });
+
+  it('abandons an edit still measuring when it is Closed, so a later Open begins none', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Fonts that never finish loading, so the measurement waits out its time
+    // limit; jsdom has no font loading interface of its own.
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready: new Promise<never>(() => undefined) },
+    });
+    try {
+      const rendered = renderPlugin(markdownPluginView.View, {
+        content,
+        map: open,
+        title: 'Notes',
+        grants: editable,
+        assets: reading({ [TEXT_REF]: 'Old' }),
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
+      await screen.findByRole('button', { name: 'Close Resource Notes' });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+      expect(screen.queryByRole('textbox', { name: 'Markdown source of Notes' })).toBeNull();
+      expect(rendered.commits.claims.inPlace).toEqual([]);
+    } finally {
+      Reflect.deleteProperty(document, 'fonts');
+      vi.useRealTimers();
+    }
   });
 
   it('measures at its own width where that is wider than the reading width', async () => {
