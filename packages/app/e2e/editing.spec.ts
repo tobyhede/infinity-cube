@@ -606,90 +606,92 @@ test('Edit on a Closed Resource saves its text and leaves it Closed, and a reloa
   await expect(resource).toContainText('Saved without Opening');
 });
 
-test('An edit draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps', async ({
-  page,
-}) => {
-  const SIZE = { width: 300, height: 200 };
-  const seeded = await seedPositionedMap(page, 'Edit Size Geometry', () => ({
-    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
-    [NEIGHBOUR.id]: { x: 900, y: 0 },
-  }));
-  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
-  await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
-  await settled(page);
-  const resource = seededNode(page, SUBJECT);
-  const rect = async () =>
-    resource.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
+for (const open of [true, false]) {
+  test(`An edit from ${open ? 'Open' : 'Closed'} draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps`, async ({
+    page,
+  }) => {
+    const SIZE = { width: 300, height: 200 };
+    const seeded = await seedPositionedMap(page, 'Edit Size Geometry', () => ({
+      [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open } },
+      [NEIGHBOUR.id]: { x: 900, y: 0 },
     }));
-  const stored = async () => (await storedPositions(page, seeded.snapshot.id))?.[SUBJECT.id];
+    await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+    await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
+    await settled(page);
+    const resource = seededNode(page, SUBJECT);
+    const rect = async () =>
+      resource.evaluate((element) => ({
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      }));
+    const stored = async () => (await storedPositions(page, seeded.snapshot.id))?.[SUBJECT.id];
 
-  const edit = async () => {
-    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+    const edit = async () => {
+      await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+      await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+    };
+    const cancel = async () => {
+      await (
+        await controls(resource)
+      )
+        .getByRole('button', { name: 'Cancel editing Resource A' })
+        .click();
+      await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
+    };
+    await expect.poll(rect).toEqual(SIZE);
+    const persistence = page.getByTestId('persistence-status');
+    const revision = await persistence.getAttribute('data-revision');
+
+    // With no Edit size stored, the editor is drawn at the larger of the
+    // plugin's measured hint and the size on each axis (ADR 0178), its width
+    // the reading width, and beginning the edit makes no revision.
+    await edit();
+    await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
+    expect((await rect()).height).toBeGreaterThanOrEqual(SIZE.height);
+    await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
+    expect(await stored()).not.toHaveProperty('editSize');
+    const measured = await rect();
+
+    // A resize while editing writes the Edit size, and leaves the size alone.
+    await selectResource(resource);
+    const handle = await boxOf(
+      resource.locator('.react-flow__resize-control.handle.bottom.right'),
+      'resize control',
+    );
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2 + 90, {
+      steps: 5,
+    });
+    await page.mouse.up();
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await resource.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const edited = await rect();
+    expect(edited.width).toBeGreaterThan(measured.width);
+    expect(edited.height).toBeGreaterThan(measured.height);
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
-  };
-  const cancel = async () => {
-    await (
-      await controls(resource)
-    )
-      .getByRole('button', { name: 'Cancel editing Resource A' })
-      .click();
-    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
-  };
-  await expect.poll(rect).toEqual(SIZE);
-  const persistence = page.getByTestId('persistence-status');
-  const revision = await persistence.getAttribute('data-revision');
+    expect(await stored()).toMatchObject({ size: SIZE, editSize: edited, content: { open } });
 
-  // With no Edit size stored, the editor is drawn at the larger of the
-  // plugin's measured hint and the size on each axis (ADR 0178), its width
-  // the reading width, and beginning the edit makes no revision.
-  await edit();
-  await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
-  expect((await rect()).height).toBeGreaterThanOrEqual(SIZE.height);
-  await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
-  expect(await stored()).not.toHaveProperty('editSize');
-  const measured = await rect();
+    // Cancel draws it at its size again; the next edit draws it at the Edit size.
+    await cancel();
+    await expect.poll(rect).toEqual(SIZE);
+    await edit();
+    await expect.poll(rect).toEqual(edited);
+    await cancel();
 
-  // A resize while editing writes the Edit size, and leaves the size alone.
-  await selectResource(resource);
-  const handle = await boxOf(
-    resource.locator('.react-flow__resize-control.handle.bottom.right'),
-    'resize control',
-  );
-  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + handle.height / 2 + 90, {
-    steps: 5,
+    // The Edit size is the Map's, so it outlives a reload.
+    await page.reload();
+    await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
+    await settled(page);
+    await expect.poll(rect).toEqual(SIZE);
+    await edit();
+    await expect.poll(rect).toEqual(edited);
+    await cancel();
+    expect(await stored()).toMatchObject({ size: SIZE, editSize: edited, content: { open } });
   });
-  await page.mouse.up();
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  await resource.evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
-  });
-  const edited = await rect();
-  expect(edited.width).toBeGreaterThan(measured.width);
-  expect(edited.height).toBeGreaterThan(measured.height);
-  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
-  expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
-
-  // Cancel draws it at its size again; the next edit draws it at the Edit size.
-  await cancel();
-  await expect.poll(rect).toEqual(SIZE);
-  await edit();
-  await expect.poll(rect).toEqual(edited);
-  await cancel();
-
-  // The Edit size is the Map's, so it outlives a reload.
-  await page.reload();
-  await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
-  await settled(page);
-  await expect.poll(rect).toEqual(SIZE);
-  await edit();
-  await expect.poll(rect).toEqual(edited);
-  await cancel();
-  expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
-});
+}
 
 test('an Edit size written on one Map is not drawn on another Map that places the same Resource', async ({
   page,
