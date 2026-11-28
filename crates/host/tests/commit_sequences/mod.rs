@@ -642,6 +642,7 @@ pub fn commit_for(step: &Step, stored: &[LoadedSpace], order: u8) -> Option<Spac
                             x: f64::from(at) * 300.0,
                             y: f64::from(*x),
                             size: None,
+                            edit_size: None,
                             content: of_no_plugin.then(chart_map_content),
                         },
                     )
