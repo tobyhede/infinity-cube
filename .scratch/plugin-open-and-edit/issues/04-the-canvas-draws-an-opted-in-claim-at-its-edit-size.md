@@ -1,6 +1,6 @@
 # 04: The canvas draws an opted-in Claim at its Edit size
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Blocked by:** 02
 
@@ -8,8 +8,8 @@
 
 ## Acceptance
 
-- [ ] `packages/resource-api/src/view` gives a Claim an opt-in to editing in place, with a slot for an optional size hint (used in ticket 05), and `renderPlugin` in `/view/testing` records it.
-- [ ] The canvas (`packages/app`, through the plugin host in `packages/ui`) draws an opted-in Resource at `editSize` or `size` while the Claim is held, and at `size` after release, Edges attached to the drawn rect.
-- [ ] A resize during an opted-in Claim writes `editSize` and leaves `size`; Save and Cancel both keep it; the next edit draws at it, after a reload and on that Map only (the same Resource on two Maps keeps two).
-- [ ] A Space Resource's Edit draws at its `size` as today.
-- [ ] Markdown and Mermaid opt in, shown by an application Playwright test that edits, resizes, Cancels and edits again.
+- [x] `packages/resource-api/src/view` gives a Claim an opt-in to editing in place, with a slot for an optional size hint (used in ticket 05), and `renderPlugin` in `/view/testing` records it.
+- [x] The canvas (`packages/app`, through the plugin host in `packages/ui`) draws an opted-in Resource at `editSize` or `size` while the Claim is held, and at `size` after release, Edges attached to the drawn rect.
+- [x] A resize during an opted-in Claim writes `editSize` and leaves `size`; Save and Cancel both keep it; the next edit draws at it, after a reload and on that Map only (the same Resource on two Maps keeps two).
+- [x] A Space Resource's Edit draws at its `size` as today.
+- [x] Markdown and Mermaid opt in, shown by an application Playwright test that edits, resizes, Cancels and edits again.
