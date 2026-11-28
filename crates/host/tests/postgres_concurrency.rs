@@ -1169,6 +1169,103 @@ mod given_overlapping_replacements {
         store.close().await;
     }
 
+    // The two tests below commit the outside replacement between the
+    // identity read and the relock, so the relock's snapshot already sees the
+    // new Meta row: only the relock's comparison with the identity it was
+    // handed tells the retired identity from the new one.
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn judges_a_complete_aggregate_commit_against_an_identity_a_replacement_retired_after_the_commit_read_it()
+     {
+        let database = Fresh::new().await;
+        let linked_other = other_space().with(
+            RACE_LINK_RESOURCE_ID,
+            space_link(
+                "To the race child",
+                RACE_CHILD_SPACE_ID,
+                RACE_CHILD_MAP_ID,
+                RACE_CHILD_GRAPH_ID,
+            ),
+        );
+        let race_child = Fixture {
+            id: RACE_CHILD_SPACE_ID,
+            document: mapped("Race child", RACE_CHILD_MAP_ID, RACE_CHILD_GRAPH_ID),
+            resources: vec![],
+        };
+        let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+        let (reached, release) = pause_once(&store, |step| matches!(step, Step::MetaRead));
+        let racing = {
+            let (linked_other, race_child) = (linked_other.clone(), race_child.clone());
+            spawn(&store, |store| async move {
+                store
+                    .commit(commit(vec![
+                        update(&linked_other.titled("Retitled after race"), Revision::FIRST),
+                        update(&race_child.titled("Retitled child"), Revision::FIRST),
+                    ]))
+                    .await
+            })
+        };
+        let racing = rendezvous(&reached, racing).await;
+        let mut blocker = Blocker::begin(&database).await;
+        blocker
+            .run(&retiring(
+                OTHER_SPACE_ID,
+                &[linked_other.clone(), race_child.clone()],
+            ))
+            .await;
+        blocker.commit().await;
+        release.notify_one();
+        let answer = joined(racing).await.unwrap();
+        assert!(
+            matches!(answer, CommitResult::Committed { .. }),
+            "judged against the identity the replacement established: {answer:?}"
+        );
+        assert_eq!(
+            store.load_space(space(OTHER_SPACE_ID)).await.unwrap(),
+            Some(linked_other.titled("Retitled after race").at(revision(1))),
+            "the stored Space carries the commit"
+        );
+        store.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn conflicts_a_replacement_authorized_against_an_identity_a_replacement_retired_after_it_read_it()
+     {
+        let database = Fresh::new().await;
+        let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+        let (reached, release) = pause_once(&store, |step| matches!(step, Step::MetaRead));
+        let racing = spawn(&store, |store| async move {
+            store
+                .replace_aggregate(
+                    input(SPACE_ID, &[repository_space().titled("Must not land")]),
+                    Some(space(SPACE_ID)),
+                )
+                .await
+        });
+        let racing = rendezvous(&reached, racing).await;
+        let mut blocker = Blocker::begin(&database).await;
+        blocker
+            .run(&retiring(OTHER_SPACE_ID, &[other_space()]))
+            .await;
+        blocker.commit().await;
+        release.notify_one();
+        assert_eq!(
+            joined(racing).await.unwrap(),
+            ReplaceResult::Conflict {
+                current_meta_space_id: Some(space(OTHER_SPACE_ID)),
+            },
+            "conflicts with the identity the outside replacement established"
+        );
+        assert_eq!(
+            store.load_aggregate().await.unwrap(),
+            aggregate(OTHER_SPACE_ID, vec![other_space().at(Revision::FIRST)]),
+            "the stored aggregate is the one the outside replacement left"
+        );
+        store.close().await;
+    }
+
     // Case: rolls back an earlier row's relock placeholder when a later row in the same replacement conflicts
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
