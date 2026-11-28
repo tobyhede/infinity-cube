@@ -289,26 +289,48 @@ impl Blocker {
 
 /// Return once at least `count` sessions on `database` wait for a lock.
 async fn waiting(database: &Fresh, count: i64) {
+    polled(
+        database,
+        "SELECT count(*) FROM pg_stat_activity \
+         WHERE datname = current_database() AND wait_event_type = 'Lock'",
+        count,
+        "waited for a lock",
+        || false,
+    )
+    .await;
+}
+
+/// Poll `query`, which counts sessions on `database`, every 10ms until it
+/// reaches `count`, answering true; answer false as soon as `given_up` holds
+/// between polls, and fail if neither happens within [`PATIENCE`].
+async fn polled(
+    database: &Fresh,
+    query: &'static str,
+    count: i64,
+    what: &str,
+    mut given_up: impl FnMut() -> bool,
+) -> bool {
     let mut watcher = database.connect().await;
     let deadline = tokio::time::Instant::now() + PATIENCE;
-    loop {
-        let waiters: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity \
-             WHERE datname = current_database() AND wait_event_type = 'Lock'",
-        )
-        .fetch_one(&mut watcher)
-        .await
-        .unwrap();
-        if waiters >= count {
-            break;
+    let reached = loop {
+        let counted: i64 = sqlx::query_scalar(query)
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+        if counted >= count {
+            break true;
+        }
+        if given_up() {
+            break false;
         }
         assert!(
             tokio::time::Instant::now() < deadline,
-            "{count} session(s) never waited for a lock; {waiters} did"
+            "{count} session(s) never {what} within {PATIENCE:?}; {counted} did"
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    };
     watcher.close().await.unwrap();
+    reached
 }
 
 /// A probe stopping `store`'s first operation to reach a step `at` accepts
@@ -1223,45 +1245,32 @@ mod given_concurrent_commits {
         database: &Fresh,
         mut task: JoinHandle<R>,
     ) -> JoinHandle<R> {
-        let mut watcher = database.connect().await;
-        let deadline = tokio::time::Instant::now() + PATIENCE;
-        loop {
-            // A row lock is waited for on the holder's transaction id, or
-            // on the tuple while another waiter is queued for it.
-            let waiters: i64 = sqlx::query_scalar(
-                "SELECT count(*) FROM pg_locks \
-                 WHERE NOT granted AND locktype IN ('transactionid', 'tuple') \
-                 AND pid IN (SELECT pid FROM pg_stat_activity \
-                 WHERE datname = current_database())",
-            )
-            .fetch_one(&mut watcher)
-            .await
-            .unwrap();
-            if waiters > 0 {
-                break;
-            }
-            if task.is_finished() {
-                panic!(
-                    "the second Edit finished without waiting for a row lock: {:?}",
-                    (&mut task).await
-                );
-            }
-            assert!(
-                tokio::time::Instant::now() < deadline,
-                "no session waited for a row lock within {PATIENCE:?}"
+        // A row lock is waited for on the holder's transaction id, or on
+        // the tuple while another waiter is queued for it.
+        let waited = polled(
+            database,
+            "SELECT count(*) FROM pg_locks \
+             WHERE NOT granted AND locktype IN ('transactionid', 'tuple') \
+             AND pid IN (SELECT pid FROM pg_stat_activity \
+             WHERE datname = current_database())",
+            1,
+            "waited for a row lock",
+            || task.is_finished(),
+        )
+        .await;
+        if !waited {
+            panic!(
+                "the second Edit finished without waiting for a row lock: {:?}",
+                (&mut task).await
             );
-            tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        watcher.close().await.unwrap();
         task
     }
 
-    // A05 and A04 in the parity audit: the fast path holds its Space's row
-    // `FOR UPDATE` before it reads the Space, so a second single-Space Edit
-    // to that Space waits there rather than beside it. Under `FOR SHARE`
-    // both would hold the row, each then wait in `lock_space` to update it,
-    // and PostgreSQL would abort one as a deadlock (40P01), answered
-    // Unavailable; with no row lock the second would not wait at all.
+    // The fast path holds its Space's row `FOR UPDATE` before it reads the
+    // Space, so a second single-Space Edit to that Space waits there rather
+    // than beside it. Under `FOR SHARE` both would hold the row and each
+    // then wait in `lock_space` to update it, a deadlock.
     #[tokio::test]
     #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
     async fn conflicts_a_single_space_edit_that_waited_on_the_row_another_holds_for_update() {
@@ -1332,7 +1341,8 @@ mod given_concurrent_commits {
         );
         assert_eq!(
             first.load_space(space(SPACE_ID)).await.unwrap(),
-            Some(first_edit.at(revision(1)))
+            Some(first_edit.at(revision(1))),
+            "the stored Space is the first Edit's write"
         );
         first.close().await;
         second.close().await;
