@@ -12,8 +12,4 @@
 - [x] Intake corpus cases under `conformance/intake/` cover an accepted `editSize` on at least two kinds, one below the Closed Size, and one of the wrong shape; both intakes pass them, and the Rust host's Export bytes for the accepted case match (`crates/host/tests/corpus.rs`).
 - [x] A Space Authoring operation writes one entry's `editSize` as one Edit, answering unchanged for the size it already stores and refusing a Resource not on the Map in the usual order (`resource-not-in-map` → `resource-not-found`); it moves no Resource.
 - [x] An entry with no `editSize` loads, round-trips and exports unchanged.
-- [x] If `plugins/infinity-cube/skills/infinity-cube-authoring/SKILL.md` lists what a placement may hold, it names `editSize`, with the version bump in all three plugin manifests.
-
-## Comments
-
-- The SKILL.md criterion does not apply: `plugins/infinity-cube/skills/infinity-cube-authoring/SKILL.md` names no full list of what a placement may hold, so it needs no `editSize` and no manifest bump.
+- Not applicable. The authoring skill does not list placement fields, so storing an Edit size requires no skill or manifest change.

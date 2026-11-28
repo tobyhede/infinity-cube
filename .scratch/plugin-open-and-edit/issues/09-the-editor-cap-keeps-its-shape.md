@@ -4,12 +4,12 @@
 
 **Blocked by:** 05
 
-**What to verify:** Ticket 05 caps the editor at the visible canvas at the current zoom, less the margin on each side. Clamp each dimension independently. The viewport can draw an editor smaller than the Closed Size. The Closed Size floor belongs to the size a completed resize can store. A plugin chooses its suggestion independently of the canvas calculation.
+**What to verify:** After ticket 05 lands, verify that the editor fits the visible canvas at the current zoom, with room for a margin where space permits. Clamp each dimension independently. The viewport can draw an editor smaller than the Closed Size. The Closed Size floor belongs to the size a completed resize can store. Each plugin chooses how to obtain its size hint.
 
 ## Acceptance
 
 - [ ] Cover a viewport too narrow, one too short and one smaller than the Closed Size on both axes. The drawn dimensions fit the available area.
 - [ ] A change of zoom updates the drawn cap and leaves the stored sizes alone.
-- [ ] A completed resize starts from the drawn rect and stores an Edit size that meets the Closed Size floor.
+- [ ] A resize starts from the drawn rect and saves the final visible length of each axis that changed. Preserve the saved dimension on an untouched axis. On a first resize, use the uncapped size hint or normal size for that axis, subject to the Closed Size minimum. If neither edge changes, save nothing.
 
-Local tests in `packages/app/test/visible-canvas-cap.test.ts` cover the margin at two zoom levels and a canvas smaller than the Closed Size. In `packages/app/test/render-adapter.test.ts`, “caps the preview while storing the size the author requests” covers the drawn preview and stored size separately.
+The [viewport cap tests on PR #547](https://github.com/tobyhede/infinity-cube/blob/56e2d387/packages/app/test/visible-canvas-cap.test.ts) cover zoom and a canvas smaller than the Closed Size. Verify the final stored dimensions separately against the resize criterion above.

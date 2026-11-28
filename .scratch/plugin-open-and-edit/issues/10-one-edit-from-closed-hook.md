@@ -4,7 +4,7 @@
 
 **Blocked by:** 07
 
-**What to decide:** Markdown and Mermaid both need source text before they can edit from Closed. Review their read, refusal and retry paths after ticket 07. ADR 0158 allows the plugins to mirror each other. Record whether sharing that code would improve it. Each plugin chooses how to obtain any editor size it suggests. The public Resource API carries dimensions and leaves that implementation to the plugin.
+**What to decide:** Markdown and Mermaid both need source text before they can edit from Closed. Review their read, refusal and retry paths after ticket 07. [ADR 0158](../../../docs/adr/0158-a-mermaid-resource-draws-its-diagram-with-mermaid-inside-its-plugin.md) allows the plugins to mirror each other. Record whether sharing that code would improve it. Each plugin chooses how to obtain any editor size it suggests. The public Resource API carries dimensions and leaves that implementation to the plugin.
 
 ## Acceptance
 
