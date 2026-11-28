@@ -88,7 +88,7 @@ _Avoid_: heading, label, caption, description, subtitle as separate fields.
 The first Title Line, followed by “…” when more lines follow, used when a sentence quotes a Title, including questions, notices and Edge labels. Controls, list rows and chrome use the first line alone.
 
 **Resource kind**:
-What a Resource's content is and does, and the name that selects its Resource plugin. The [plugin list](packages/plugins/src/domain.ts) defines the bundled kinds.
+What a Resource's content is and does, and the name that selects its Resource plugin. See [Space and Resources](docs/requirements/space-and-resources.md#kinds) for the bundled kinds.
 _Avoid_: MIME type, content type, file type, format; a bare "kind" where another sort of kind could be meant.
 
 **Content kind**:

@@ -6,7 +6,7 @@ How work moves from a question to committed code in this repo.
 
 - **Survey.** Follow the [root reading order](../../AGENTS.md#read-before-changing-an-area). Identify the requirement and the code or evidence the task affects.
 - **Design decision.** If the task leaves a design decision open, propose a candidate and walk its decision tree one question at a time, with a recommendation for each. Confirm the decision before implementing it. Record settled terms in `CONTEXT.md` and apply [the ADR criteria](#when-to-write-an-adr).
-- **Implement and verify.** Apply the agreed change. For behaviour changes, update the owning requirement and its evidence in the same commit. Follow the [verification bar](#verification-bar).
+- **Implement and verify.** Apply the agreed change. For a behaviour change, follow [the implementation rule](#implement-a-behaviour-change). Follow the [verification bar](#verification-bar).
 - **Tracked work.** Resolve its ticket with an `## Answer` and update any requirement status the evidence changes.
 
 Park work outside the current task in the [issue tracker](issue-tracker.md), under `.scratch/<feature>/`.
@@ -34,7 +34,9 @@ Use the [root task table](../../AGENTS.md#read-before-changing-an-area) or the [
 
 **ADR acceptance.** A new or revised decision goes into an ADR. Acceptance leaves the requirements snapshot as it was, and `check` lists the decision as pending.
 
-**Implementation.** A code change that changes behaviour updates the owning requirement in the same commit. A ruling that settles which source holds, or records detail no ADR decides, belongs in the owning requirement and its dated trace.
+### Implement a behaviour change
+
+Update the owning requirement, its reason and its evidence in the same commit as the behaviour change. A ruling that settles which source holds, or records detail no ADR decides, belongs in the owning requirement and its dated trace.
 
 ### Refresh the snapshot
 
@@ -49,9 +51,11 @@ A wording fix or faithful restatement that leaves ADR coverage unchanged leaves 
 
 When moving an ADR to `docs/adr/superseded/`, run `python3 scripts/adr_snapshot.py supersede OLD NEW` in the same change. Confirm that `check` recognises the move. A requirement still citing the old file stays pending until the refresh updates it.
 
+### Maintain requirements
+
 **Code is evidence of what is built.** It does not retire an accepted rule. Surface a disagreement between code, a requirement and an ADR, and resolve it explicitly before changing the rule. Preserve the distinction between `not built` and `bug: code differs`; update status only with evidence.
 
-**Maintain the owner.** Update a behaviour's requirement in the same commit as its change, including the rule's reason and evidence. Link from other topics rather than duplicating the rule. Rule ids are append-only: leave a removed rule as a tombstone and never renumber its neighbours. Check references whenever a rule is added, removed or redirected.
+**Maintain the owner.** Link from other topics rather than duplicating the rule. Rule ids are append-only: leave a removed rule as a tombstone and never renumber its neighbours. Check references whenever a rule is added, removed or redirected.
 
 **Keep treatment in code and tests.** Durations, easing, colours, sizes, spacing, typography, shadows and animation choreography alone are not requirements. Requirements retain what is drawn and what it means, what is reachable, what is focused or announced, and what is stored.
 
@@ -125,7 +129,7 @@ Follow [Before claiming done](../../AGENTS.md#before-claiming-done) and use the 
 - Reproduce a defect before fixing it, then show the regression case pass.
 - Domain tests assert refusal codes and typed context; presentation tests assert wording and accessibility. Non-Edits retain the working snapshot's identity.
 - Every new interaction tied to a Resource, Map, Graph or Edge has an acceptance case for replacement of its Space while the interaction is live. Verify that its draft and pending continuation are discarded.
-- For an unavailable command covered by [UI-29](../requirements/ui.md), assert `aria-disabled` and verify activation does nothing.
+- For a control using `aria-disabled`, including an unavailable command under [UI-29](../requirements/ui.md), assert the attribute and verify activation does nothing. `toBeDisabled` checks native disabled state.
 - Base UI dispatches a `PointerEvent` for keyboard-activated menu items; jsdom needs that subclass supplied. Let a dismissed menu's focus-restoring microtask settle before the next gesture under test.
 
 ### Fixture data

@@ -31,7 +31,7 @@ Accepted ADRs in [`docs/adr/`](docs/adr/README.md) are binding and append-only. 
 ## Rules that bite
 
 - **Start production UI work with the `shadcn-first-ui` skill, before any code.** Search `@project/ui`, then the shadcn registry; record a deviation before hand-rolling. See [the skill](.agents/skills/shadcn-first-ui/SKILL.md) and [UI](docs/requirements/ui.md).
-- **Leave dev servers and occupied ports alone.** Verify with tests and CI. See [Running hosts](docs/agents/verification.md#running-hosts).
+- **Never start a development server to verify a change, stop or restart another person’s server, or free a port.** Verify with tests and CI. See [Running hosts](docs/agents/verification.md#running-hosts).
 - **Mint ids through the injected `newId`, never by mocking `crypto.randomUUID`.** See [Anti-slop](docs/agents/anti-slop.md).
 - **Relative imports inside a package are extensionless, and type-only imports use `import type`.**
 - **`eslint-suppressions.json` only shrinks:** it is generated, never hand-edited or regenerated to admit a new assertion. See [Anti-slop](docs/agents/anti-slop.md#the-suppressions-baseline).

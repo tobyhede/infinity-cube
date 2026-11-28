@@ -24,12 +24,12 @@ it('accepts exactly 12 KiB of UTF-8 instructions and rejects one more byte', () 
 });
 
 it('rejects a broken alias and a regular file replacing the alias', () => {
-  const alias = join(root, 'CLAUDE.md');
-  rmSync(alias);
-  symlinkSync('missing', alias);
+  const claudeInstructions = join(root, 'CLAUDE.md');
+  rmSync(claudeInstructions);
+  symlinkSync('missing', claudeInstructions);
   expect(check().status).toBe(1);
-  rmSync(alias);
-  writeFileSync(alias, '');
+  rmSync(claudeInstructions);
+  writeFileSync(claudeInstructions, '');
   expect(check().status).toBe(1);
 });
 

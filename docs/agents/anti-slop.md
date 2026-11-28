@@ -26,7 +26,7 @@ Since ADR 0062 a narrowing assertion faces two gates doing different jobs, and s
 - `anti-slop/require-safety-comment-for-type-assertion` (oxlint) **demands a reason**. Put a `SAFETY:` comment immediately before a non-const assertion or its containing statement. State the evidence that makes the assertion safe, including at sites covered by the baseline.
 - `@typescript-eslint/no-unsafe-type-assertion` (ESLint, type-aware) **caps the count**. A narrowing assertion is an error anywhere in the repository.
 
-For assertion changes, run both `pnpm lint:anti-slop` and `pnpm lint`. The first checks the stated evidence and the second enforces the count. Review the assertion and its evidence even if both pass.
+For assertion changes, run both `pnpm lint:anti-slop` and `pnpm lint`. Oxlint requires a nearby justification and rejects wording that admits the assertion is unverified. ESLint enforces the count. Reviewers check that the stated invariant holds at the assertion.
 
 ### The suppressions baseline
 
