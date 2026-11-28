@@ -2115,6 +2115,7 @@ dependencies = [
  "http-conformance",
  "serde_json",
  "sha2 0.10.9",
+ "sqlx",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -2124,6 +2125,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]

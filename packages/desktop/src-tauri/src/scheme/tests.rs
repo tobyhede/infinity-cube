@@ -559,6 +559,9 @@ impl http_conformance::Adapter for Fixture {
 
 http_conformance::cases!(Fixture);
 
+mod postgres;
+mod sqlite;
+
 mod given_a_window_an_aggregates_page_opened {
     use super::*;
 

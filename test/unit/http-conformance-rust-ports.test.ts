@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * The HTTP conformance cases are written once, in TypeScript, and ported by
- * hand to Rust for four adapters: the Rust host's application and run
+ * hand to Rust for six adapters: the Rust host's application and run
  * (`crates/host/tests/`), the same application over the SQLite repository
  * (`crates/host/tests/sqlite_wire.rs`), over the PostgreSQL repository
- * (`crates/host/tests/postgres_wire.rs`) and the desktop scheme handler
- * (`packages/desktop/src-tauri/src/scheme/tests.rs`). A case every adapter runs
+ * (`crates/host/tests/postgres_wire.rs`), and the desktop scheme handler over a
+ * folder's run (`packages/desktop/src-tauri/src/scheme/tests.rs`), over the
+ * SQLite repository (`scheme/tests/sqlite.rs`) and over the PostgreSQL
+ * repository (`scheme/tests/postgres.rs`, ADR 0181). A case every adapter runs
  * is written once, in the table `crates/http-conformance/src/cases.rs`, which
  * each adapter runs by invoking `http_conformance::cases!`; a case only one
  * runs stays in that adapter's own files. This holds each adapter to the case
@@ -125,6 +127,21 @@ const LISTENER =
 const NO_LOCK =
   'the scheme handler has no port, Host check or launch secret (Storage ST-121); the window that made a request and its page admit it';
 
+const SCHEME_ORIGIN =
+  'the scheme handler refuses a change whose Origin is not the Aggregate’s itself, in plain text, before the application sees it (`comes_from`, `scheme.rs`), and its requests name no Host for the application to judge an Origin against';
+
+const SCHEME_WHOLE_BODY =
+  'the scheme handler takes the body as one `Vec<u8>` (`OpenAggregates::answer`, `scheme.rs`), so it never reads a body in chunks; whether the webview delivers a chunked upload whole is not tested';
+
+const DATABASE_ESTABLISHED =
+  'the shell serves a database’s window only once `host::establish_meta_space` has established its Meta Space, refusing it otherwise (`open_database`, `server.rs`, ADR 0181), so no window is served by a store holding none';
+
+const databaseCondition = (wire: string): string =>
+  `the scheme handler hands every request it admits to the host’s application unchanged, and ${wire} holds that application’s answer over this repository in that condition; the shell refuses a database in it before serving a window (\`open_database\`, \`server.rs\`), and a store failing while its window is open is not driven through the scheme`;
+
+const DATABASE_NO_EXPORT =
+  'a database’s window has no directory, Import or Export (ADR 0181): every Edit is committed to the repository before it is answered, which the table’s commit cases hold';
+
 const NO_LAUNCH_SECRET =
   '`infinity-cube serve --store sqlite` announces no launch secret and sets no cookie, as `infinity-cube run` does not: its `Host` check is its only lock (Storage ST-120), and the process case skips itself for a host announcing no secret';
 
@@ -169,12 +186,10 @@ const PORTS: readonly Port[] = [
         NO_LOCK,
       'refuses a missing directory, announcing why and exiting non-zero':
         'the shell refuses a folder it cannot open before any window or scheme answer exists (`server.rs`, `open_run`)',
-      'answers 403 forbidden to a change whose Origin is %s, changing nothing':
-        'the scheme handler refuses a change whose Origin is not the Aggregate’s itself, in plain text, before the application sees it (`comes_from`, `scheme.rs`), and its requests name no Host for the application to judge an Origin against',
-      'commits a chunked body that declares no length':
-        'the scheme handler takes the body as one `Vec<u8>` (`OpenAggregates::answer`, `scheme.rs`), so it never reads a body in chunks; whether the webview delivers a chunked upload whole is not tested',
+      'answers 403 forbidden to a change whose Origin is %s, changing nothing': SCHEME_ORIGIN,
+      'commits a chunked body that declares no length': SCHEME_WHOLE_BODY,
       'answers 413 payload-too-large to a chunked body of * bytes that declares no length':
-        'the scheme handler takes the body as one `Vec<u8>` (`OpenAggregates::answer`, `scheme.rs`), so it never reads a body in chunks; whether the webview delivers a chunked upload whole is not tested',
+        SCHEME_WHOLE_BODY,
       'writes an edit once edits have been quiet, and keeps it on SIGINT':
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
       'writes an edit not yet written when stopped by SIGINT, and exits zero':
@@ -187,6 +202,76 @@ const PORTS: readonly Port[] = [
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
       'writes the initialization with the next Edit (ST-65)':
         'the scheme handler writes nothing: the shell runs the host’s `Run`, which crates/host/tests/run.rs holds',
+    },
+  },
+  {
+    name: 'the desktop scheme handler over the SQLite repository',
+    files: ['packages/desktop/src-tauri/src/scheme/tests/sqlite.rs'],
+    exempt: {
+      'answers / with 503 persistence-unavailable while no Meta Space is established':
+        DATABASE_ESTABLISHED,
+      'answers 503 persistence-unavailable for every read and write of an unreachable store':
+        databaseCondition('crates/host/tests/sqlite_wire.rs'),
+      'answers 500 internal-error for broken stored state': databaseCondition(
+        'crates/host/tests/sqlite_wire.rs',
+      ),
+      'answers a product address over a %s store with %s': databaseCondition(
+        'crates/host/tests/sqlite_wire.rs',
+      ),
+      'answers 403 forbidden to a change whose Origin is %s, changing nothing': SCHEME_ORIGIN,
+      'answers 421 to a request naming any Host but its own': NO_LOCK,
+      'answers 403 to a request without the session cookie, and to a wrong launch secret': NO_LOCK,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        NO_LOCK,
+      'refuses a missing directory, announcing why and exiting non-zero':
+        'a SQLite file that does not exist is refused before any window or scheme answer exists, and no file is created (`open_database`, `server.rs`; `scheme/tests/sqlite.rs` › `refuses_a_file_that_does_not_exist_and_creates_none`)',
+      'commits a chunked body that declares no length': SCHEME_WHOLE_BODY,
+      'answers 413 payload-too-large to a chunked body of * bytes that declares no length':
+        SCHEME_WHOLE_BODY,
+      'writes an edit once edits have been quiet, and keeps it on SIGINT': DATABASE_NO_EXPORT,
+      'writes an edit not yet written when stopped by SIGINT, and exits zero': DATABASE_NO_EXPORT,
+      'writes an edit not yet written when its standard input closes, and exits zero':
+        DATABASE_NO_EXPORT,
+      'leaves the directory byte for byte unchanged when opening a Space initializes it (ST-65)':
+        DATABASE_NO_EXPORT,
+      'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
+        DATABASE_NO_EXPORT,
+      'writes the initialization with the next Edit (ST-65)': DATABASE_NO_EXPORT,
+    },
+  },
+  {
+    name: 'the desktop scheme handler over the PostgreSQL repository',
+    files: ['packages/desktop/src-tauri/src/scheme/tests/postgres.rs'],
+    exempt: {
+      'answers / with 503 persistence-unavailable while no Meta Space is established':
+        DATABASE_ESTABLISHED,
+      'answers 503 persistence-unavailable for every read and write of an unreachable store':
+        databaseCondition('crates/host/tests/postgres_wire.rs'),
+      'answers 500 internal-error for broken stored state': databaseCondition(
+        'crates/host/tests/postgres_wire.rs',
+      ),
+      'answers a product address over a %s store with %s': databaseCondition(
+        'crates/host/tests/postgres_wire.rs',
+      ),
+      'answers 403 forbidden to a change whose Origin is %s, changing nothing': SCHEME_ORIGIN,
+      'answers 421 to a request naming any Host but its own': NO_LOCK,
+      'answers 403 to a request without the session cookie, and to a wrong launch secret': NO_LOCK,
+      'trades the launch secret for an HttpOnly, SameSite=Strict session cookie by a redirect':
+        NO_LOCK,
+      'refuses a missing directory, announcing why and exiting non-zero':
+        'a PostgreSQL database has no directory; one that does not answer is refused before any window or scheme answer exists (`open_database`, `server.rs`; `scheme/tests/postgres.rs` › `refuses_a_database_that_does_not_answer_naming_it_without_its_password`)',
+      'commits a chunked body that declares no length': SCHEME_WHOLE_BODY,
+      'answers 413 payload-too-large to a chunked body of * bytes that declares no length':
+        SCHEME_WHOLE_BODY,
+      'writes an edit once edits have been quiet, and keeps it on SIGINT': DATABASE_NO_EXPORT,
+      'writes an edit not yet written when stopped by SIGINT, and exits zero': DATABASE_NO_EXPORT,
+      'writes an edit not yet written when its standard input closes, and exits zero':
+        DATABASE_NO_EXPORT,
+      'leaves the directory byte for byte unchanged when opening a Space initializes it (ST-65)':
+        DATABASE_NO_EXPORT,
+      'initializes the Space again on a second run over the directory the first run left unchanged (ST-65)':
+        DATABASE_NO_EXPORT,
+      'writes the initialization with the next Edit (ST-65)': DATABASE_NO_EXPORT,
     },
   },
   {

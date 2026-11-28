@@ -15,6 +15,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::aggregates::Close;
+use crate::database::Database;
 
 /// What serves an Aggregate in these tests: the directory it serves.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +32,12 @@ enum Start {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Call {
     Start(PathBuf),
-    OpenWindow { label: String, title: String },
+    /// A database, by its place.
+    StartDatabase(PathBuf),
+    OpenWindow {
+        label: String,
+        title: String,
+    },
     Stop(Server),
     Focus(String),
     Offer(PathBuf),
@@ -104,6 +110,22 @@ impl OpenFolderPort for Fake<'_> {
         match self.starts.borrow_mut().pop_front().unwrap_or(Start::Serve) {
             Start::Serve => Ok(Started::Serving(Server(directory.to_path_buf()))),
             Start::Empty => Ok(Started::Empty),
+            Start::Fail => Err(OpenError::Url(url::ParseError::EmptyHost)),
+        }
+    }
+
+    /// Serves it, refuses it for [`Start::Empty`], or fails for [`Start::Fail`].
+    fn start_database(
+        &self,
+        database: &Database,
+        _label: &str,
+    ) -> Result<Started<Server>, OpenError> {
+        self.record(Call::StartDatabase(database.place()));
+        match self.starts.borrow_mut().pop_front().unwrap_or(Start::Serve) {
+            Start::Serve => Ok(Started::Serving(Server(database.place()))),
+            Start::Empty => Ok(Started::Refused {
+                message: "refused".to_owned(),
+            }),
             Start::Fail => Err(OpenError::Url(url::ParseError::EmptyHost)),
         }
     }
@@ -567,5 +589,129 @@ mod given_a_launch {
         open(&shell, &registry, Origin::CommandLine, &[]);
 
         assert_eq!(shell.calls(), [Call::ShowStart]);
+    }
+}
+
+/// A SQLite file the shell would open, at a path that need not exist: the
+/// fake serves it without reading it.
+fn sqlite_file(path: &str) -> Database {
+    Database::SqliteFile(PathBuf::from(path))
+}
+
+mod given_a_database_that_opens {
+    use super::*;
+
+    #[test]
+    fn its_space_window_opens_titled_with_its_name_and_the_start_window_closes() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry);
+        let cube = sqlite_file("/spaces/cube.db");
+
+        let opened = open_database(&shell, &registry, Origin::StartWindow, &cube);
+
+        assert_eq!(opened, Ok(()));
+        assert_eq!(
+            shell.calls(),
+            [
+                Call::StartDatabase(cube.place()),
+                Call::OpenWindow {
+                    label: "space-0".to_owned(),
+                    title: "cube.db".to_owned(),
+                },
+                Call::CloseStart,
+            ]
+        );
+    }
+
+    #[test]
+    fn opening_it_again_focuses_its_window_and_starts_nothing() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry);
+        let cube = sqlite_file("/spaces/cube.db");
+
+        let _first = open_database(&shell, &registry, Origin::Menu, &cube);
+        let again = open_database(&shell, &registry, Origin::Menu, &cube);
+
+        assert_eq!(again, Ok(()));
+        let starts = shell
+            .calls()
+            .into_iter()
+            .filter(|call| matches!(call, Call::StartDatabase(_)))
+            .count();
+        assert_eq!(starts, 1, "a database already open is not served twice");
+        assert!(shell.asked(&Call::Focus("space-0".to_owned())));
+    }
+
+    #[test]
+    fn a_folder_at_the_same_path_is_another_space() {
+        let (_temporary, rust) = folder("rust");
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry);
+
+        open(&shell, &registry, Origin::Menu, std::slice::from_ref(&rust));
+        let file = Database::SqliteFile(rust);
+        let _opened = open_database(&shell, &registry, Origin::Menu, &file);
+
+        assert!(
+            shell.asked(&Call::StartDatabase(file.place())),
+            "a file is not taken for the folder at its path"
+        );
+    }
+}
+
+mod given_a_database_that_does_not_open {
+    use super::*;
+
+    #[test]
+    fn its_refusal_is_answered_and_it_can_be_asked_for_again() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let shell = Fake::new(&registry).starting([Start::Empty]);
+        let cube = sqlite_file("/spaces/cube.db");
+
+        let refused = open_database(&shell, &registry, Origin::StartWindow, &cube);
+
+        assert_eq!(refused, Err("refused".to_owned()));
+        assert!(
+            !shell.asked(&Call::CloseStart),
+            "the Start window stays to go on from"
+        );
+        assert!(lock(&registry).is_empty(), "nothing is left reserved");
+        assert_eq!(
+            open_database(&shell, &registry, Origin::Menu, &cube),
+            Ok(()),
+            "asked for again, it is started again"
+        );
+    }
+
+    #[test]
+    fn a_window_that_fails_stops_its_server_and_says_why() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let mut shell = Fake::new(&registry);
+        shell.window_fails = true;
+        let cube = sqlite_file("/spaces/cube.db");
+
+        let refused = open_database(&shell, &registry, Origin::Menu, &cube);
+
+        assert_eq!(
+            refused,
+            Err(
+                "Could not open the SQLite file /spaces/cube.db: the Space's address is not a URL: empty host"
+                    .to_owned()
+            )
+        );
+        assert!(shell.asked(&Call::Stop(Server(cube.place()))));
+        assert!(lock(&registry).is_empty(), "nothing is left reserved");
+    }
+
+    #[test]
+    fn asked_for_once_a_quit_has_begun_nothing_starts_and_nothing_is_said() {
+        let registry: Mutex<Registry<Server>> = Mutex::default();
+        let _taken = lock(&registry).take_all();
+        let shell = Fake::new(&registry);
+
+        let opened = open_database(&shell, &registry, Origin::Menu, &sqlite_file("/a.db"));
+
+        assert_eq!(opened, Ok(()));
+        assert!(shell.calls().is_empty(), "{:?}", shell.calls());
     }
 }

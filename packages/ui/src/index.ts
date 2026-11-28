@@ -166,6 +166,8 @@ export {
   EntityActionsIcon,
   FitViewIcon,
   FolderOpenIcon,
+  SqliteFileIcon,
+  DatabaseIcon,
   GraphIcon,
   ImageIcon,
   MapIcon,

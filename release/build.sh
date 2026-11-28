@@ -17,7 +17,7 @@
 # and Ubuntu's `musl-tools`) and `<arch>-apple-darwin` on macOS. The archive
 # lands in `target/preview-build/`, or `--out`, and installs with
 #
-#   INFINITY_CUBE_DOWNLOAD_URL=file://<out> INFINITY_CUBE_VERSION=v<version> sh release/install.sh
+#   INFINITY_CUBE_DOWNLOAD_URL=file://<out> INFINITY_CUBE_VERSION=v<version> sh release/install.sh --cli
 #
 # `--desktop` builds the desktop application (rust-host issue 06) instead,
 # on macOS only: an ad-hoc signed `InfinityCube-<version>-<target>.dmg`, opened
@@ -174,14 +174,36 @@ target_dir="${CARGO_TARGET_DIR:-$root/target}"
 
 smoke=""
 stage=""
-trap 'rm -rf "$smoke" "$stage"' EXIT
+mounted=""
+cleanup() {
+	if [ -n "$mounted" ]; then
+		hdiutil detach "$mounted" >/dev/null || return
+	fi
+	rm -rf "$smoke" "$stage"
+}
+trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
+
+# Curl applies globbing to file URLs. Percent-encode every byte except
+# letters, digits, slashes, hyphens, dots, underscores and tildes.
+url_path() {
+	printf '%s' "$1" | LC_ALL=C awk '
+		BEGIN { for (i = 1; i < 256; i++) code[sprintf("%c", i)] = i }
+		{
+			if (NR > 1) printf "%%0A"
+			for (i = 1; i <= length($0); i++) {
+				c = substr($0, i, 1)
+				if (c ~ /[A-Za-z0-9\/._~-]/) printf "%s", c
+				else printf "%%%02X", code[c]
+			}
+		}'
+}
 
 # Every archive and bundle in the folder, so one built earlier for another
 # target or version still installs from it.
 write_sums() {
 	(
-		cd "$out"
+		cd "$1"
 		for packed in infinity-cube-*.tar.gz InfinityCube-*.dmg InfinityCube-*.app.tar.gz; do
 			if [ -e "$packed" ]; then
 				sha256 "$packed"
@@ -211,26 +233,44 @@ if [ "$desktop" = 1 ]; then
 	shown="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")"
 	[ "$shown" = "$version" ] || fail "the application names version $shown, not $version"
 
-	# The disk image that ships, installed and opened once with a Space: its run takes the
-	# directory's lock before it Imports (Storage ST-124), so the lock file
-	# appearing shows the bundled host started on this Space.
 	if [ "$target" = "$native" ]; then
-		step "Opening a Space with the desktop application"
-		# Resolved through symlinks: macOS's temporary directory is under /var, a
-		# symlink to /private/var, and Tauri refuses to find its resources, or
-		# check for an update, from an executable whose path holds a symlink.
+		step "Installing the desktop application and opening a Space"
 		smoke="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-smoke.XXXXXX")"
+		# Tauri needs the executable's path to contain no symlinks.
+		# macOS's temporary directory can be under /var, a link to /private/var.
 		smoke="$(cd "$smoke" && pwd -P)"
-		# Installed as a person installs it: copied out of the disk image.
-		hdiutil attach -nobrowse -readonly -mountpoint "$smoke/volume" "$dmg" >/dev/null
-		cp -R "$smoke/volume/InfinityCube.app" "$smoke/InfinityCube.app"
-		hdiutil detach "$smoke/volume" >/dev/null
-		codesign --verify --deep --strict "$smoke/InfinityCube.app"
-		executable="$(find "$smoke/InfinityCube.app/Contents/MacOS" -type f -perm -u+x | head -n 1)"
+		if [ "$target" = aarch64-apple-darwin ]; then
+			# Give the installer the files it expects without publishing
+			# the disk image before the smoke test passes.
+			smoke_release="$smoke/release"
+			mkdir "$smoke_release"
+			cp "$dmg" "$smoke_release/$name.dmg"
+			write_sums "$smoke_release"
+			for install in first replacement; do
+				say "Checking the $install install"
+				HOME="$smoke" INFINITY_CUBE_DOWNLOAD_URL="file://$(url_path "$smoke_release")" INFINITY_CUBE_VERSION="v$version" \
+					sh release/install.sh
+			done
+			installed_app="$smoke/Applications/InfinityCube.app"
+		else
+			# The public installer offers the CLI on Intel. Copy the
+			# desktop app from its disk image to smoke-test a local build.
+			mountpoint="$smoke/volume"
+			hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$dmg" >/dev/null
+			mounted="$mountpoint"
+			installed_app="$smoke/InfinityCube.app"
+			cp -R "$mounted/InfinityCube.app" "$installed_app"
+			hdiutil detach "$mounted" >/dev/null
+			mounted=""
+		fi
+		codesign --verify --deep --strict "$installed_app"
+		executable="$(find "$installed_app/Contents/MacOS" -type f -perm -u+x | head -n 1)"
 		cp -R conformance/init/expected "$smoke/space"
 		"$executable" "$smoke/space" >"$smoke/log" 2>&1 &
 		pid=$!
 		waited=0
+		# The host takes the Space directory's lock before Import (ST-124).
+		# The lock file shows that the bundled host started on this Space.
 		until [ -e "$smoke/space/.infinity-cube.lock" ]; do
 			if ! kill -0 "$pid" 2>/dev/null; then
 				cat "$smoke/log" >&2
@@ -242,7 +282,7 @@ if [ "$desktop" = 1 ]; then
 				fi
 				kill "$pid"
 				cat "$smoke/log" >&2
-				find "$smoke/InfinityCube.app/Contents/Resources" | head -n 40 >&2
+				find "$installed_app/Contents/Resources" | head -n 40 >&2
 				fail "the desktop application did not open the Space within 60 seconds"
 			fi
 			sleep 1
@@ -286,7 +326,7 @@ if [ "$desktop" = 1 ]; then
 }
 EOF
 	fi
-	write_sums
+	write_sums "$out"
 	step "Built $out/$name.dmg"
 	cat "$out/SHA256SUMS"
 	exit 0
@@ -333,26 +373,12 @@ for expected in "from this preview build, v$version" "INFINITY_CUBE_VERSION=v$ve
 done
 archive="$out/$name.tar.gz"
 tar -C "$stage" -czf "$archive" "$name"
-write_sums
+write_sums "$out"
 
 step "Built $archive"
 cat "$out/SHA256SUMS"
 say "Install it here with:"
-# curl reads a file URL, with globbing on, so every byte of the folder's path
-# but a letter, digit, `/`, `-`, `.`, `_` or `~` is percent-encoded, and both
-# values are quoted for the shell, a single quote in either included.
+# Quote both values for the shell, including any single quote they contain.
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-url_path() {
-	printf '%s' "$1" | LC_ALL=C awk '
-		BEGIN { for (i = 1; i < 256; i++) code[sprintf("%c", i)] = i }
-		{
-			if (NR > 1) printf "%%0A"
-			for (i = 1; i <= length($0); i++) {
-				c = substr($0, i, 1)
-				if (c ~ /[A-Za-z0-9\/._~-]/) printf "%s", c
-				else printf "%%%02X", code[c]
-			}
-		}'
-}
 url="file://$(url_path "$out")"
-say "  INFINITY_CUBE_DOWNLOAD_URL=$(quote "$url") INFINITY_CUBE_VERSION=v$version sh $(quote "$root/release/install.sh")"
+say "  INFINITY_CUBE_DOWNLOAD_URL=$(quote "$url") INFINITY_CUBE_VERSION=v$version sh $(quote "$root/release/install.sh") --cli"

@@ -775,6 +775,13 @@ jobs:
       # step if the filter finds none.
       - name: The PostgreSQL store's tests
         run: cargo nextest run --workspace --exclude infinity-cube-desktop --run-ignored only --no-tests=fail -E 'binary(/^postgres/) | binary(=serve_postgres)' --locked
+      # The desktop scheme handler over the PostgreSQL repository (ADR 0181):
+      # the HTTP conformance table and the database refusals through a Space
+      # window on a PostgreSQL database, ignored by the run above for the same
+      # reason. They live in the shell's own test binary, not a `postgres*`
+      # one, so they are selected by module.
+      - name: The desktop scheme handler over PostgreSQL
+        run: cargo nextest run -p infinity-cube-desktop --run-ignored only --no-tests=fail -E 'test(/^scheme::tests::postgres::/)' --locked
       - name: Stop PostgreSQL
         if: always() && steps.postgres-env.outcome == 'success'
         run: pnpm postgres:down

@@ -21,3 +21,11 @@
 - CI's `postgres` job builds the CLI and the browser application after the Vite proof and runs the proof again on `serve --store postgres --built packages/app/dist`, with a cache key of its own. The job's timeout is now 30 minutes, as the `sqlite` job's is for the same cold build.
 - Run locally under Node 26, on a database migrated from `migrations-sql/postgres/`: the proof passed on the Vite host and on the Rust host.
 - Still to build: the two row dumps and their currency checks (the first three boxes). They extend the scripts that `rust-sqlite-test-coverage` 08 is to write for SQLite: a check that regenerates the TypeScript-written dump, a Rust script of commits writing a dump, and a TypeScript test reading it. That ticket is still `ready-for-agent`, so nothing exists yet to extend.
+
+**2026-11-28, implement-tickets run.** Built on PR #556 (`feat/rust-postgresql-store-10-rows-across-runtimes-and-the-restart-proof`, based on `main`, head `d3730821`), including the row dumps and currency checks listed above as still to build. Every acceptance criterion is met by the build's own account, and `CI passed` is green. Review findings fixed in round 1 and confirmed by the audit: the revision check reads only the stored text (`3e413e91`); `test/support/postgres-rows.ts` and `build-tooling.md` record why the raw `pg` driver is used (`8b269c8e`); and the shared script now marks two Spaces exported (`d3730821`). Nothing is open.
+
+Two things to record here, which the run could not write into tickets:
+- **Equivalent mutant.** In `crates/host/tests/postgres_rows.rs`, binding the revision as `int8` rather than `f64` stores the same text, so no test can tell them apart. The `f64` binding is still killed through the stored value.
+- **A choice for the maintainer.** `@types/pg` is pinned at 8.23.1, because DefinitelyTyped never published an 8.22.x to match `pg` 8.22. The alternative is 8.21.0. `build-tooling.md` records the choice.
+
+What remains is the maintainer's: mark the PR ready and merge it. Do not rebuild this ticket.

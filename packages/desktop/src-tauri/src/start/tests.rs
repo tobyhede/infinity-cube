@@ -559,6 +559,7 @@ mod given_the_page {
     fn the_form_opens_at_its_own_address_and_the_start_screen_at_the_page() {
         assert_eq!(page(Screen::Start), "start.html");
         assert_eq!(page(Screen::NewSpace), "start.html#new-space");
+        assert_eq!(page(Screen::Postgres), "start.html#postgres");
     }
 }
 
@@ -631,6 +632,8 @@ mod given_the_capabilities {
                 "start_create_space",
                 "start_open_folder",
                 "start_open_recent",
+                "start_open_sqlite_file",
+                "start_connect_postgres",
                 "start_close",
             ],
             "build.rs declares the Start window's commands"

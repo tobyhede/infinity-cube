@@ -1040,6 +1040,15 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/start/tests.rs` holds New Space over real folders, and ticket 02 of `.scratch/start-window` records it driven in a live WebKitGTK window.',
   },
   {
+    id: 'start-window-connects-to-a-postgresql-database',
+    storyFile: 'components/start-window.stories.tsx',
+    storyExport: 'FirstLaunch',
+    claim:
+      'The desktop Start window offers Open SQLite File… and Connect to PostgreSQL Database… beside Open Folder…; Connect to PostgreSQL Database… shows a form with URL focused and a separate Password field that hides what is typed, Connect shows one status while the shell connects, a database the shell cannot open comes back as a notice above the buttons with the URL kept, and Escape returns to the start screen.',
+    applicationEvidence:
+      'The Start window is a page of the desktop shell’s own build (ADR 0172), answered by its invoke commands, which no Playwright host serves; `packages/desktop/src-tauri/src/open_folder/tests.rs` › `given_a_database_that_opens` and `given_a_database_that_does_not_open` hold the open behind Connect, and `src/scheme/tests/postgres.rs` the database it serves.',
+  },
+  {
     id: 'start-window-refuses-a-name-beside-the-field',
     storyFile: 'components/start-window.stories.tsx',
     storyExport: 'FirstLaunch',

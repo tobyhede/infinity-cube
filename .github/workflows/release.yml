@@ -156,8 +156,8 @@ jobs:
           export INFINITY_CUBE_DOWNLOAD_URL="file://$RUNNER_TEMP/archive"
           export INFINITY_CUBE_VERSION="v$VERSION"
           export INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/installed"
-          sh release/install.sh
-          sh release/install.sh
+          sh release/install.sh --cli
+          sh release/install.sh --cli
           shown="$("$INFINITY_CUBE_INSTALL_DIR/infinity-cube" --version)"
           case "$shown" in
             "infinity-cube $VERSION ("*) ;;
@@ -167,7 +167,7 @@ jobs:
           mkdir -p "$mismatched"
           cp "$ARCHIVE" "$mismatched/"
           printf '%064d  %s\n' 0 "$(basename "$ARCHIVE")" > "$mismatched/SHA256SUMS"
-          if INFINITY_CUBE_DOWNLOAD_URL="file://$mismatched" INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/refused" sh release/install.sh 2> "$RUNNER_TEMP/refused.err"; then
+          if INFINITY_CUBE_DOWNLOAD_URL="file://$mismatched" INFINITY_CUBE_INSTALL_DIR="$RUNNER_TEMP/refused" sh release/install.sh --cli 2> "$RUNNER_TEMP/refused.err"; then
             echo "::error::the install script installed an archive SHA256SUMS does not match"
             exit 1
           fi
@@ -227,6 +227,8 @@ jobs:
           INFINITY_CUBE_SCREENSHOT: ${{ runner.temp }}/desktop-screenshot.png
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Test desktop installer with macOS bundle metadata
+        run: pnpm exec vitest run test/unit/install-script.test.ts
       # A dry run may go without the updater's key; a release may not, since
       # an installed build would then never hear of the next one.
       - name: Require the signed update on a tag
@@ -305,19 +307,23 @@ jobs:
           cat > notes.md <<EOF
           **Preview build** of InfinityCube $VERSION. It makes no compatibility promise: a directory it writes may not open in a later preview build, so keep your directory in git and read it with the build that wrote it (ADR 0166).
 
-          Install it on macOS or Linux with:
+          ### Desktop app for Macs with Apple silicon
 
           \`\`\`sh
           curl -fsSL https://github.com/$GH_REPO/releases/download/$TAG/install.sh | INFINITY_CUBE_VERSION=$TAG sh
           \`\`\`
 
-          It checks the archive against \`SHA256SUMS\` and puts \`infinity-cube\` in \`~/.local/bin\`. Then run \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`.
+          Open **InfinityCube** from \`~/Applications\`. The Start window lets you open a folder or create a Space.
 
-          Or download the archive for your platform, unpack it and follow its README. On macOS, run \`xattr -d com.apple.quarantine infinity-cube\` once first, because the build is not signed; the install script needs no such step.
+          To install from the disk image, open \`InfinityCube-$VERSION-aarch64-apple-darwin.dmg\` and drag InfinityCube to Applications. If macOS says it cannot verify the developer, open **System Settings → Privacy & Security**, choose **Open Anyway** for InfinityCube, and confirm. See [Apple's instructions](https://support.apple.com/en-us/102445).
 
-          ### The desktop application (macOS, Apple silicon)
+          ### Command-line build for macOS and Linux
 
-          Download \`InfinityCube-$VERSION-aarch64-apple-darwin.dmg\`, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so the first time you open it macOS refuses: open **System Settings → Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm. Or run \`xattr -dr com.apple.quarantine /Applications/InfinityCube.app\` once. After that it opens as any application does, and it offers each newer preview build when one is published.
+          \`\`\`sh
+          curl -fsSL https://github.com/$GH_REPO/releases/download/$TAG/install.sh | INFINITY_CUBE_VERSION=$TAG sh -s -- --cli
+          \`\`\`
+
+          The script checks the download against \`SHA256SUMS\` and installs the command in \`~/.local/bin\`. Run \`infinity-cube init my-space\`, then \`infinity-cube run my-space\`.
           EOF
           gh release create "$TAG" dist/*.tar.gz dist/*.dmg dist/*.sig dist/latest.json dist/SHA256SUMS release/install.sh \
             --draft --latest --verify-tag \

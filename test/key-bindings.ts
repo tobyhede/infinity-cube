@@ -235,6 +235,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'cancel the form and return to the start screen, writing nothing (UI-111)',
   },
   {
+    module: 'packages/app/src/components/StartWindow.tsx',
+    sourceKey: 'Escape',
+    occurrence: 2,
+    key: 'Escape',
+    surface: "Start window's PostgreSQL form",
+    behaviour: 'cancel the form and return to the start screen, connecting to nothing (UI-111)',
+  },
+  {
     module: 'packages/plugin-image/src/view.tsx',
     sourceKey: 'Escape',
     occurrence: 1,

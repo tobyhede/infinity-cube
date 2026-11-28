@@ -20,9 +20,11 @@ const Window = ({ children }: { children: ReactNode }) => (
 
 /**
  * A launch with nothing to open and nothing kept: New Space the default
- * button, Open Folder… beside it, and Recent's empty state. New Space opens
- * the form on Documents; a name with `/` is refused beside it, and the name
- * `Disk full` stands in for a write that fails.
+ * button, Open Folder…, Open SQLite File… and Connect to PostgreSQL
+ * Database… beside it, and Recent's empty state. New Space opens the form on
+ * Documents; a name with `/` is refused beside it, and the name `Disk full`
+ * stands in for a write that fails. The PostgreSQL form refuses a URL naming
+ * the database `unmigrated` as the shell refuses one it cannot read.
  */
 export const FirstLaunch: Story = () => (
   <Window>
@@ -53,6 +55,10 @@ const Refused = ({
       recents={[]}
       onNewSpace={noop}
       onOpenFolder={noop}
+      onOpenSqliteFile={noop}
+      onShowPostgres={noop}
+      onPostgresChange={noop}
+      onConnect={noop}
       onOpenRecent={noop}
       onNameChange={noop}
       onBrowse={noop}
