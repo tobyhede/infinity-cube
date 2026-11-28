@@ -131,7 +131,8 @@ pub async fn lists_a_space_without_a_title_by_its_id<H: Harness>(harness: &mut H
         Ok(vec![host::SpaceSummary {
             id: id(SPACE_ID),
             title: SPACE_ID.to_owned(),
-        }])
+        }]),
+        "a Space with no title is listed by its id"
     );
     Ok(())
 }
@@ -230,7 +231,8 @@ pub async fn refuses_to_store_a_revision_above_the_ceiling<H: Harness>(harness: 
     let store = reopened(harness).await;
     assert_same!(
         store.load_space(id(SPACE_ID)).await,
-        Ok(Some(stored(&first, CEILING, None)))
+        Ok(Some(stored(&first, CEILING, None))),
+        "the Space stands at the ceiling as it was"
     );
     Ok(())
 }
