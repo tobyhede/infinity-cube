@@ -396,8 +396,8 @@ pub fn update(snapshot: &SpaceSnapshot, expected: u64) -> SpaceChange {
 }
 
 /// A value as the contract compares it: with every JSON object in it, each
-/// Resource's content and each placement's Map content, in ascending key
-/// order. The TypeScript contract compares with `toEqual`, which ignores
+/// Resource's content, each placement's Map content and each Map's
+/// positions, in ascending key order. The TypeScript contract compares with `toEqual`, which ignores
 /// object-key order, so a store may answer content in its own key order
 /// (PostgreSQL's `jsonb` sorts keys by length, then by bytes) and still
 /// answer the value written. Everything else a store answers is typed, so it
@@ -467,6 +467,10 @@ impl InKeyOrder for SpaceSnapshot {
             for (_, placement) in &mut map.positions {
                 placement.content = placement.content.in_key_order();
             }
+            // A Map's positions are a JSON object keyed by Resource id, all
+            // of one length, so ascending id order is its key order.
+            map.positions
+                .sort_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
         }
         snapshot
     }

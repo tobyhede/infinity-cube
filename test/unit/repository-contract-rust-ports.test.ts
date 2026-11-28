@@ -738,10 +738,6 @@ const POSTGRES_EXEMPT = {
     pending('08'),
   ),
 
-  // test/integration/aggregate-commit-differential.test.ts
-  'gives memory and PostgreSQL the same public outcome over generated aggregate changes':
-    pending('11'),
-
   // test/integration/database-http-runtime.test.ts
   ...exemptEach(
     [
@@ -821,7 +817,7 @@ const POSTGRES: Port = {
   table: filesUnder('crates/host/tests/repository_contract', (name) => name.endsWith('.rs')),
   // Each ticket adds the files it creates: `crates/host/tests/postgres*.rs`
   // from 05, `crates/cli/tests/serve_postgres.rs` from 09.
-  files: [POSTGRES_HARNESS],
+  files: [POSTGRES_HARNESS, 'crates/host/tests/postgres_properties.rs'],
   exempt: POSTGRES_EXEMPT,
 };
 
@@ -995,8 +991,8 @@ describe('the Rust PostgreSQL repository', () => {
     expect(
       postgresTally(POSTGRES_RUNS, { marked: POSTGRES_MARKED, exempt: POSTGRES.exempt }),
     ).toEqual({
-      ported: 79,
-      pending: 100,
+      ported: 80,
+      pending: 99,
       'does not apply': 0,
       'owned elsewhere': 10,
       'accepted difference': 4,
