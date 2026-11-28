@@ -12,20 +12,13 @@ Each preview build on the [releases page](https://github.com/tobyhede/infinity-c
 
 ### The desktop application on macOS
 
-1. **Install it.** Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
+Run this once on a Mac with Apple silicon.
 
-2. **Make a Space.** InfinityCube opens to its **Start window**. Choose **New Space**, accept the name and location or change them, and choose **Create Space**: it writes the Space to `~/Documents/Untitled Space` by default, or to the first free name after it, such as `Untitled Space 2`, if that folder is taken, and opens it in a window named after the folder. **Open Folder…** in the Start window, or **File › Open…** (Command-O), opens a Space's folder you already have; a folder that holds no Space yet is offered **Create Space**. **File › New Space…** (Command-N) makes another.
+```sh
+curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+```
 
-3. **Put it in git before you edit**, so git can restore the Space as it was first written. Use the folder the window is named after; the commands below are for the default, `~/Documents/Untitled Space`:
-
-   ```sh
-   git init ~/Documents/"Untitled Space"
-   echo .infinity-cube.lock >> ~/Documents/"Untitled Space"/.gitignore
-   git -C ~/Documents/"Untitled Space" add -A
-   git -C ~/Documents/"Untitled Space" commit -m "New Space"
-   ```
-
-Then [use the Space](#use-a-space).
+Open `~/Applications` in Finder and double-click **InfinityCube**. The **Start window** lets you open an existing folder or create a Space.
 
 ### The `infinity-cube` command on macOS or Linux
 
@@ -34,7 +27,7 @@ The command runs a Space in your browser, with no clone, Node or pnpm. It has no
 1. **Install it.**
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh -s -- --cli
    ```
 
    It checks the download against the release's `SHA256SUMS` and puts `infinity-cube` in `~/.local/bin`, printing the line to add if that folder is not on your `PATH`. Done when `infinity-cube --version` names the build.
@@ -55,7 +48,16 @@ Then [use the Space](#use-a-space). [`release/README.md`](release/README.md) cov
 
 ## Use a Space
 
-However you opened it, a Space works the same way. In the commands below, `<dir>` is the Space's folder; keep the quotes, since a desktop Space's folder name such as `Untitled Space` holds a space.
+In the commands below, replace `<dir>` with the Space's folder. Keep the quotes around paths with spaces.
+
+To track a new Space in git, run these commands before editing.
+
+```sh
+git init "<dir>"
+echo .infinity-cube.lock >> "<dir>/.gitignore"
+git -C "<dir>" add -A
+git -C "<dir>" commit -m "New Space"
+```
 
 1. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 

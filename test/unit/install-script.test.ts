@@ -81,8 +81,9 @@ function install(
   toolDirectories: string,
   home: string,
   settings: Readonly<Record<string, string>>,
+  args: readonly string[] = ['--cli'],
 ): Run {
-  const run = spawnSync('sh', [script], {
+  const run = spawnSync('sh', [script, ...args], {
     cwd: home,
     encoding: 'utf8',
     env: { PATH: toolDirectories, HOME: home, TMPDIR: home, ...settings },
@@ -93,6 +94,55 @@ function install(
 const realPath = process.env['PATH'] ?? '/usr/bin:/bin';
 
 describe('release/install.sh', () => {
+  it('offers the CLI on Linux when invoked without arguments', async () => {
+    const root = await temporaryDirectory();
+    const tools = join(root, 'tools');
+    await mkdir(tools);
+    await executable(tools, 'uname', 'case "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac');
+
+    const result = install(`${tools}${delimiter}${realPath}`, root, {}, []);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('requires a Mac with Apple silicon');
+    expect(result.stderr).toContain('sh -s -- --cli');
+    expect(await readdir(root)).toEqual(['tools']);
+  });
+
+  it('installs the checked desktop bundle into Applications and tells the user to open it', async () => {
+    const root = await temporaryDirectory();
+    const tools = join(root, 'tools');
+    await mkdir(tools);
+    await executable(tools, 'uname', 'case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; esac');
+    await executable(
+      tools,
+      'hdiutil',
+      'case "$1" in attach) mkdir -p "$5/InfinityCube.app"; cp "$6" "$5/InfinityCube.app/fixture" ;; detach) rm -r "$2" ;; esac',
+    );
+    await executable(tools, 'ditto', 'cp -R "$1" "$2"');
+    await executable(tools, 'codesign', 'test -f "$4/fixture"');
+    const archive = `InfinityCube-${version}-aarch64-apple-darwin.dmg`;
+    const image = 'fake disk image';
+    await writeFile(join(root, archive), image);
+    await writeFile(
+      join(root, 'SHA256SUMS'),
+      `${createHash('sha256').update(image).digest('hex')}  ${archive}\n`,
+    );
+
+    const result = install(
+      `${tools}${delimiter}${realPath}`,
+      root,
+      { INFINITY_CUBE_VERSION: version, INFINITY_CUBE_DOWNLOAD_URL: `file://${root}` },
+      [],
+    );
+
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Open InfinityCube from ~/Applications.');
+    const applications = join(root, 'Applications');
+    expect(await readdir(applications)).toEqual(['InfinityCube.app']);
+    expect(await readFile(join(applications, 'InfinityCube.app', 'fixture'), 'utf8')).toBe(image);
+  });
+
   it('leaves no staged copy in the install folder when installing fails after copying', async () => {
     const root = await temporaryDirectory();
     const served = await fakeRelease(root, targets);

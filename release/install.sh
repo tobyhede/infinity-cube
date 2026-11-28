@@ -1,12 +1,11 @@
 #!/bin/sh
-# Installs the `infinity-cube` preview build (ADR 0166) for this machine:
+# Installs the InfinityCube desktop preview on Apple silicon:
 #
 #   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
 #
-# It picks the archive for this platform from a published GitHub release,
-# checks it against the release's SHA256SUMS, and puts the binary in
-# ~/.local/bin, replacing any copy already there. It needs curl, needs no
-# sudo and edits no shell configuration.
+# Open InfinityCube from ~/Applications when the install finishes.
+# Pass --cli (pipe to sh -s -- --cli) for the command-line build.
+# Both modes check the download against the release's SHA256SUMS.
 #
 # Settings, all optional:
 #   INFINITY_CUBE_VERSION       the release to install, `v0.1.0-preview.1` or
@@ -19,7 +18,7 @@
 #                               INFINITY_CUBE_VERSION. The release workflow
 #                               tests this script with a file:// URL.
 #
-# Uninstall by deleting the binary: rm ~/.local/bin/infinity-cube
+# Uninstall by removing the installed app or CLI binary.
 
 # Everything runs from main, called on the last line, so a download cut off
 # part-way through runs nothing.
@@ -103,38 +102,7 @@ sha256_of() {
 	fi
 }
 
-main() {
-	need curl
-	need uname
-	need tar
-	need mktemp
-
-	repo="${INFINITY_CUBE_REPO:-tobyhede/infinity-cube}"
-	install_dir="${INFINITY_CUBE_INSTALL_DIR:-${HOME:?HOME is not set}/.local/bin}"
-	download_url="${INFINITY_CUBE_DOWNLOAD_URL:-}"
-	requested="${INFINITY_CUBE_VERSION:-}"
-
-	target="$(detect_target)"
-
-	work="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-install.XXXXXX")"
-	staged=""
-	trap 'rm -rf "$work"; [ -z "$staged" ] || rm -f "$staged"' EXIT
-	trap 'exit 1' HUP INT TERM
-
-	if [ -n "$requested" ]; then
-		tag="v${requested#v}"
-	elif [ -n "$download_url" ]; then
-		fail "INFINITY_CUBE_DOWNLOAD_URL needs INFINITY_CUBE_VERSION"
-	else
-		tag="$(latest_tag "$repo" "$work")"
-	fi
-	version="${tag#v}"
-	[ -n "$download_url" ] || download_url="https://github.com/$repo/releases/download/$tag"
-
-	name="infinity-cube-$version-$target"
-	archive="$name.tar.gz"
-
-	say "Installing infinity-cube $version for $target"
+download_checked() {
 	fetch "$download_url/$archive" "$work/$archive" ||
 		fail "could not download $download_url/$archive; release $tag may have no build for $target"
 	fetch "$download_url/SHA256SUMS" "$work/SHA256SUMS" ||
@@ -145,6 +113,67 @@ main() {
 	actual="$(sha256_of "$work/$archive")"
 	[ "$actual" = "$expected" ] ||
 		fail "$archive does not match SHA256SUMS (expected $expected, got $actual); nothing was installed"
+
+}
+
+cleanup() {
+	if [ -n "$desktop_stage" ]; then
+		if [ -d "$desktop_stage/previous.app" ] && [ ! -e "$destination" ]; then
+			mv "$desktop_stage/previous.app" "$destination" || {
+				say "Your previous app is at $desktop_stage/previous.app" >&2
+				return 1
+			}
+		fi
+		rm -rf "$desktop_stage"
+	fi
+	[ -z "$staged" ] || rm -f "$staged"
+	if [ -n "$mounted" ]; then
+		hdiutil detach "$mounted" >/dev/null || return 1
+	fi
+	rm -rf "$work"
+}
+
+install_desktop() {
+	archive="InfinityCube-$version-$target.dmg"
+	say "Installing InfinityCube $version for Apple silicon"
+	download_checked
+
+	volume="$work/volume"
+	hdiutil attach -nobrowse -readonly -mountpoint "$volume" "$work/$archive" >/dev/null ||
+		fail "could not open $archive"
+	mounted="$volume"
+	install_dir="${HOME:?HOME is not set}/Applications"
+	mkdir -p "$install_dir"
+	destination="$install_dir/InfinityCube.app"
+	stage_dir="$install_dir/.infinity-cube-install"
+	mkdir "$stage_dir" || fail "could not reserve $stage_dir for this install"
+	desktop_stage="$stage_dir"
+	new_app="$desktop_stage/InfinityCube.app"
+	ditto "$volume/InfinityCube.app" "$new_app" || fail "could not copy InfinityCube from $archive"
+	hdiutil detach "$mounted" >/dev/null || fail "could not eject $archive"
+	mounted=""
+	codesign --verify --deep --strict "$new_app" || fail "could not verify InfinityCube's code signature"
+	if [ -L "$destination" ]; then
+		fail "$destination is a symbolic link. Move it aside first"
+	fi
+	if [ -e "$destination" ]; then
+		identifier="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$destination/Contents/Info.plist" 2>/dev/null)" ||
+			fail "$destination already exists. Move it aside first"
+		[ "$identifier" = dev.infinitycube.desktop ] ||
+			fail "$destination belongs to another app. Move it aside first"
+		mv "$destination" "$desktop_stage/previous.app"
+	fi
+	mv "$new_app" "$destination"
+	say "Installed InfinityCube $version to $destination"
+	say "Open InfinityCube from ~/Applications."
+}
+
+install_cli() {
+	name="infinity-cube-$version-$target"
+	archive="$name.tar.gz"
+	say "Installing infinity-cube $version for $target"
+	download_checked
+	install_dir="${INFINITY_CUBE_INSTALL_DIR:-${HOME:?HOME is not set}/.local/bin}"
 
 	tar -xzf "$work/$archive" -C "$work"
 	[ -f "$work/$name/infinity-cube" ] || fail "$archive holds no $name/infinity-cube"
@@ -197,6 +226,55 @@ main() {
 
 	say ""
 	say "Start with: infinity-cube init my-space && infinity-cube run my-space"
+}
+
+main() {
+	case "$#:${1-}" in
+	0:) mode=desktop ;;
+	1:--cli) mode=cli ;;
+	*) fail "usage: install.sh [--cli]" ;;
+	esac
+
+	need curl
+	need uname
+	need mktemp
+	target="$(detect_target)"
+	if [ "$mode" = desktop ]; then
+		[ "$target" = aarch64-apple-darwin ] ||
+			fail "the desktop preview requires a Mac with Apple silicon. For the CLI, run:
+  curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh -s -- --cli"
+		need hdiutil
+		need ditto
+		need codesign
+	else
+		need tar
+	fi
+
+	repo="${INFINITY_CUBE_REPO:-tobyhede/infinity-cube}"
+	download_url="${INFINITY_CUBE_DOWNLOAD_URL:-}"
+	requested="${INFINITY_CUBE_VERSION:-}"
+	work="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-install.XXXXXX")"
+	staged=""
+	desktop_stage=""
+	mounted=""
+	trap cleanup EXIT
+	trap 'exit 1' HUP INT TERM
+
+	if [ -n "$requested" ]; then
+		tag="v${requested#v}"
+	elif [ -n "$download_url" ]; then
+		fail "INFINITY_CUBE_DOWNLOAD_URL needs INFINITY_CUBE_VERSION"
+	else
+		tag="$(latest_tag "$repo" "$work")"
+	fi
+	version="${tag#v}"
+	[ -n "$download_url" ] || download_url="https://github.com/$repo/releases/download/$tag"
+
+	if [ "$mode" = desktop ]; then
+		install_desktop
+	else
+		install_cli
+	fi
 }
 
 main "$@"

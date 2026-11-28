@@ -17,7 +17,7 @@
 # and Ubuntu's `musl-tools`) and `<arch>-apple-darwin` on macOS. The archive
 # lands in `target/preview-build/`, or `--out`, and installs with
 #
-#   INFINITY_CUBE_DOWNLOAD_URL=file://<out> INFINITY_CUBE_VERSION=v<version> sh release/install.sh
+#   INFINITY_CUBE_DOWNLOAD_URL=file://<out> INFINITY_CUBE_VERSION=v<version> sh release/install.sh --cli
 #
 # `--desktop` builds the desktop application (rust-host issue 06) instead,
 # on macOS only: an ad-hoc signed `InfinityCube-<version>-<target>.dmg`, opened
@@ -177,6 +177,19 @@ stage=""
 trap 'rm -rf "$smoke" "$stage"' EXIT
 trap 'exit 1' HUP INT TERM
 
+url_path() {
+	printf '%s' "$1" | LC_ALL=C awk '
+		BEGIN { for (i = 1; i < 256; i++) code[sprintf("%c", i)] = i }
+		{
+			if (NR > 1) printf "%%0A"
+			for (i = 1; i <= length($0); i++) {
+				c = substr($0, i, 1)
+				if (c ~ /[A-Za-z0-9\/._~-]/) printf "%s", c
+				else printf "%%%02X", code[c]
+			}
+		}'
+}
+
 # Every archive and bundle in the folder, so one built earlier for another
 # target or version still installs from it.
 write_sums() {
@@ -211,22 +224,23 @@ if [ "$desktop" = 1 ]; then
 	shown="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")"
 	[ "$shown" = "$version" ] || fail "the application names version $shown, not $version"
 
-	# The disk image that ships, installed and opened once with a Space: its run takes the
-	# directory's lock before it Imports (Storage ST-124), so the lock file
-	# appearing shows the bundled host started on this Space.
+	step "Packing $name"
+	cp "$dmg" "$out/$name.dmg"
+	write_sums
+
+	# Use the public installer against the disk image that ships.
 	if [ "$target" = "$native" ]; then
-		step "Opening a Space with the desktop application"
-		# Resolved through symlinks: macOS's temporary directory is under /var, a
-		# symlink to /private/var, and Tauri refuses to find its resources, or
-		# check for an update, from an executable whose path holds a symlink.
+		step "Installing the desktop application and opening a Space"
 		smoke="$(mktemp -d "${TMPDIR:-/tmp}/infinity-cube-smoke.XXXXXX")"
 		smoke="$(cd "$smoke" && pwd -P)"
-		# Installed as a person installs it: copied out of the disk image.
-		hdiutil attach -nobrowse -readonly -mountpoint "$smoke/volume" "$dmg" >/dev/null
-		cp -R "$smoke/volume/InfinityCube.app" "$smoke/InfinityCube.app"
-		hdiutil detach "$smoke/volume" >/dev/null
-		codesign --verify --deep --strict "$smoke/InfinityCube.app"
-		executable="$(find "$smoke/InfinityCube.app/Contents/MacOS" -type f -perm -u+x | head -n 1)"
+		for install in first replacement; do
+			say "Checking the $install install"
+			HOME="$smoke" INFINITY_CUBE_DOWNLOAD_URL="file://$(url_path "$out")" INFINITY_CUBE_VERSION="v$version" \
+				sh release/install.sh
+		done
+		installed_app="$smoke/Applications/InfinityCube.app"
+		codesign --verify --deep --strict "$installed_app"
+		executable="$(find "$installed_app/Contents/MacOS" -type f -perm -u+x | head -n 1)"
 		cp -R conformance/init/expected "$smoke/space"
 		"$executable" "$smoke/space" >"$smoke/log" 2>&1 &
 		pid=$!
@@ -242,7 +256,7 @@ if [ "$desktop" = 1 ]; then
 				fi
 				kill "$pid"
 				cat "$smoke/log" >&2
-				find "$smoke/InfinityCube.app/Contents/Resources" | head -n 40 >&2
+				find "$installed_app/Contents/Resources" | head -n 40 >&2
 				fail "the desktop application did not open the Space within 60 seconds"
 			fi
 			sleep 1
@@ -260,8 +274,6 @@ if [ "$desktop" = 1 ]; then
 		say "$target is not this machine's target (${native:-none}), so the application is not opened"
 	fi
 
-	step "Packing $name"
-	cp "$dmg" "$out/$name.dmg"
 	if [ -e "$bundle/macos/InfinityCube.app.tar.gz.sig" ]; then
 		cp "$bundle/macos/InfinityCube.app.tar.gz" "$out/$name.app.tar.gz"
 		cp "$bundle/macos/InfinityCube.app.tar.gz.sig" "$out/$name.app.tar.gz.sig"
@@ -342,17 +354,5 @@ say "Install it here with:"
 # but a letter, digit, `/`, `-`, `.`, `_` or `~` is percent-encoded, and both
 # values are quoted for the shell, a single quote in either included.
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-url_path() {
-	printf '%s' "$1" | LC_ALL=C awk '
-		BEGIN { for (i = 1; i < 256; i++) code[sprintf("%c", i)] = i }
-		{
-			if (NR > 1) printf "%%0A"
-			for (i = 1; i <= length($0); i++) {
-				c = substr($0, i, 1)
-				if (c ~ /[A-Za-z0-9\/._~-]/) printf "%s", c
-				else printf "%%%02X", code[c]
-			}
-		}'
-}
 url="file://$(url_path "$out")"
-say "  INFINITY_CUBE_DOWNLOAD_URL=$(quote "$url") INFINITY_CUBE_VERSION=v$version sh $(quote "$root/release/install.sh")"
+say "  INFINITY_CUBE_DOWNLOAD_URL=$(quote "$url") INFINITY_CUBE_VERSION=v$version sh $(quote "$root/release/install.sh") --cli"
