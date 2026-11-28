@@ -1,14 +1,12 @@
-# 10: One edit-from-Closed hook for the text plugins
+# 10: Decide whether the text plugins share how they start editing from Closed
 
 **Status:** needs-triage
 
 **Blocked by:** 07
 
-**What to build:** The Markdown and Mermaid views carry the same code to begin an edit from Closed: `startEdit`, the `beginning` ref, the measuring wait, the hidden measurer and the pending-edit state (`'idle' | 'reading' | 'editing'`). ADR 0158 accepts the two views mirroring each other, but every fix has to be made twice. Decide whether `resource-api/view` should offer this as one hook. Exporting it changes the plugin contract, so that decision may need an ADR ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)).
-
-Raised in review on PRs #547 and #551.
+**What to decide:** Markdown and Mermaid both need source text before they can edit from Closed. Review their read, refusal and retry paths after ticket 07. ADR 0158 allows the plugins to mirror each other. Record whether sharing that code would improve it. Each plugin chooses how to obtain any editor size it suggests. The public Resource API carries dimensions and leaves that implementation to the plugin.
 
 ## Acceptance
 
-- [ ] A decision is recorded: a shared hook in `resource-api/view`, or the mirroring kept with the reason.
-- [ ] If a hook is added, both plugins use it, and their existing tests pass unchanged.
+- [ ] Record the reasons to share the read and edit transitions or keep them in each plugin. A proposed change to the plugin contract follows the ADR workflow.
+- [ ] If code is shared, both plugins keep their own choice of editor and sizing implementation. Their behaviour tests cover a refused read or Claim and a later successful Edit.

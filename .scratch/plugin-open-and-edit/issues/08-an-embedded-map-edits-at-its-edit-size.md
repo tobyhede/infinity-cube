@@ -4,12 +4,10 @@
 
 **Blocked by:** 05
 
-**What to build:** [ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md) says a Resource's Edit size applies wherever its Map is drawn and the Resource is edited (ADR 0112). After ticket 05, only the outer canvas does this. An editor on a Map drawn inside a Space Resource is not drawn at its Edit size, not capped at the visible canvas, and the camera does not pan to show it, because `editorCap` is worked out only in `SpaceCanvas.tsx`. Make an embedded Map's editor follow the same rules as the outer canvas's.
-
-Raised in review on PR #547 (`packages/app/src/canvas-resource-authoring.ts`).
+**What to build:** Apply the same editor sizing, displacement and camera rules on a Map drawn inside a Space Resource as on the outer canvas (ADR 0112, ADR 0178 and ticket 05). Distinguish the parent Space Resource’s Claim to author its Map from the child plugin’s editor. The child’s Map entry owns its Edit size.
 
 ## Acceptance
 
-- [ ] An editor on an embedded Map is drawn at its entry's Edit size, or at its default when none is stored.
-- [ ] It is capped at the part of the canvas that is visible, and the camera pans to show it as it does on the outer canvas.
-- [ ] A Playwright test edits a Markdown Resource on an embedded Map and finds it drawn at its Edit size.
+- [ ] The embedded Map draws the child editor at its stored Edit size, then falls back to its plugin’s suggestion, then to its Display size.
+- [ ] Use the visible bounds and zoom for the embedded editor. Apply the cap and least pan there and leave the parent’s Display size intact.
+- [ ] A browser test edits and resizes an embedded Markdown Resource, ends the edit and edits again. It checks where the child’s Edit size was stored and that the parent’s size and the child’s Display size survived.
