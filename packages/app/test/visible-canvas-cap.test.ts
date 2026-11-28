@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { leastPanToShow, visibleCanvasCap } from '../src/visible-canvas-cap';
 
 describe('keeping an editor in view (ADR 0178)', () => {
@@ -7,6 +8,10 @@ describe('keeping an editor in view (ADR 0178)', () => {
   it('caps at the visible canvas less a margin, at the zoom', () => {
     expect(visibleCanvasCap(area, 1)).toEqual({ width: 904, height: 704 });
     expect(visibleCanvasCap(area, 0.5)).toEqual({ width: 1808, height: 1408 });
+  });
+
+  it('caps no axis below the Closed Size, however small the visible canvas', () => {
+    expect(visibleCanvasCap({ width: 100, height: 90 }, 4)).toEqual(COLLAPSED_RESOURCE_SIZE);
   });
 
   it('pans nothing for a rect already in view', () => {

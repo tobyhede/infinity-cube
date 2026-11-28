@@ -4,8 +4,10 @@ import { COLLAPSED_RESOURCE_SIZE, type ResourceSize } from '@project/core';
 const VIEW_MARGIN = 48;
 
 /**
- * The most an in-place editor is drawn at (ADR 0178): the visible canvas at
- * the current zoom, less a margin on each side, never below the Closed Size.
+ * The most an in-place editor is drawn at: the visible canvas at the current
+ * zoom, less a margin on each side (ADR 0178). Each axis is kept at least the
+ * Closed Size, a floor ADR 0178 does not state; `visible-canvas-cap.test.ts`
+ * holds it.
  */
 export function visibleCanvasCap(
   viewport: { readonly width: number; readonly height: number },
