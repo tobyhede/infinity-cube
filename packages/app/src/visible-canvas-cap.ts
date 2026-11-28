@@ -1,11 +1,11 @@
-import type { ResourceSize } from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE, type ResourceSize } from '@project/core';
 
 /** The screen pixels kept clear on each side of the visible canvas. */
 const VIEW_MARGIN = 48;
 
-/** Leave at least one screen pixel for the editor on a small canvas. */
-function margin(axis: number): number {
-  return Math.min(VIEW_MARGIN, Math.max(0, (axis - 1) / 2));
+/** Only take margin from space left over once the Closed Size would fit. */
+function margin(available: number, closed: number, zoom: number): number {
+  return Math.min(VIEW_MARGIN, Math.max(0, (available - closed * zoom) / 2));
 }
 
 /** The available width and height in Map units. */
@@ -14,8 +14,10 @@ export function visibleCanvasCap(
   zoom: number,
 ): ResourceSize {
   return {
-    width: (viewport.width - 2 * margin(viewport.width)) / zoom,
-    height: (viewport.height - 2 * margin(viewport.height)) / zoom,
+    width:
+      (viewport.width - 2 * margin(viewport.width, COLLAPSED_RESOURCE_SIZE.width, zoom)) / zoom,
+    height:
+      (viewport.height - 2 * margin(viewport.height, COLLAPSED_RESOURCE_SIZE.height, zoom)) / zoom,
   };
 }
 
@@ -39,8 +41,8 @@ export function leastPanToShow(
 ) {
   const left = rect.x * viewport.zoom + viewport.x;
   const top = rect.y * viewport.zoom + viewport.y;
-  const horizontal = margin(area.width);
-  const vertical = margin(area.height);
+  const horizontal = margin(area.width, COLLAPSED_RESOURCE_SIZE.width, viewport.zoom);
+  const vertical = margin(area.height, COLLAPSED_RESOURCE_SIZE.height, viewport.zoom);
   return {
     x: shift(left, left + rect.width * viewport.zoom, horizontal, area.width - horizontal),
     y: shift(top, top + rect.height * viewport.zoom, vertical, area.height - vertical),

@@ -9,8 +9,29 @@ describe('keeping an editor in view (ADR 0178)', () => {
     expect(visibleCanvasCap(area, 0.5)).toEqual({ width: 1808, height: 1408 });
   });
 
-  it('keeps even a small canvas within its visible bounds at the current zoom', () => {
-    expect(visibleCanvasCap({ width: 100, height: 90 }, 4)).toEqual({ width: 1, height: 0.25 });
+  it('shrinks each margin before using space needed for the Closed Size', () => {
+    const narrow = { width: 300, height: 400 };
+    expect(visibleCanvasCap(narrow, 1)).toEqual({ width: 260, height: 304 });
+    expect(
+      leastPanToShow({ x: 0, y: 0, width: 260, height: 304 }, { x: 0, y: 0, zoom: 1 }, narrow),
+    ).toEqual({ x: 20, y: 48 });
+
+    const short = { width: 1000, height: 180 };
+    expect(visibleCanvasCap(short, 1)).toEqual({ width: 904, height: 146 });
+    expect(
+      leastPanToShow({ x: 100, y: 25, width: 300, height: 146 }, { x: 0, y: 0, zoom: 1 }, short),
+    ).toEqual({ x: 0, y: -8 });
+  });
+
+  it('uses the whole visible axis when the zoomed Closed Size cannot fit', () => {
+    const viewport = { width: 100, height: 90 };
+    const zoom = 4;
+    const cap = visibleCanvasCap(viewport, zoom);
+    expect(cap).toEqual({ width: 25, height: 22.5 });
+    expect(leastPanToShow({ x: 10, y: 5, ...cap }, { x: 0, y: 0, zoom }, viewport)).toEqual({
+      x: -40,
+      y: -20,
+    });
   });
 
   it('pans nothing for a rect already in view', () => {
