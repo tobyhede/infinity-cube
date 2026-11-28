@@ -1326,6 +1326,121 @@ mod given_concurrent_commits {
     }
 }
 
+/// The writes that take neither the aggregate lock nor a row lock first,
+/// `mark_exported` and `store_asset`, beside a writer holding the row they
+/// write. Each runs `READ COMMITTED`, so once that writer commits it writes
+/// the row as it then stands; under `REPEATABLE READ` or `SERIALIZABLE` it
+/// would fail `40001`, answered unavailable.
+mod given_an_unlocked_write_beside_another_writer {
+    use super::*;
+    use host::{AssetHash, AssetStored, StoredAsset};
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn marks_a_space_exported_once_a_commit_holding_its_row_lands() {
+        let database = Fresh::new().await;
+        let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+        let renamed = repository_space().titled("Renamed");
+        // Stopped having written the Space's row, so holding its row lock.
+        let (reached, release) = pause_once(
+            &store,
+            |step| matches!(step, Step::ResourceReread(id) if *id == space(SPACE_ID)),
+        );
+        let committing = spawn(&store, {
+            let renamed = renamed.clone();
+            |store| async move {
+                store
+                    .commit(commit(vec![update(&renamed, Revision::FIRST)]))
+                    .await
+            }
+        });
+        let committing = rendezvous(&reached, committing).await;
+        let marking = spawn(&store, |store| async move {
+            store.mark_exported(space(SPACE_ID), revision(1)).await
+        });
+        waiting(&database, 1).await;
+        assert!(
+            !marking.is_finished(),
+            "mark_exported waits for the commit's row lock"
+        );
+        release.notify_one();
+        assert_eq!(
+            joined(committing).await,
+            Ok(CommitResult::Committed {
+                revisions: vec![(space(SPACE_ID), revision(1))],
+                deleted_space_ids: vec![],
+            }),
+            "the commit holding the row lock lands"
+        );
+        assert_eq!(
+            joined(marking).await,
+            Ok(()),
+            "mark_exported writes the row the commit left"
+        );
+        assert_eq!(
+            store.load_space(space(SPACE_ID)).await,
+            Ok(Some(LoadedSpace {
+                exported_revision: Some(revision(1)),
+                ..renamed.at(revision(1))
+            })),
+            "the Space holds the commit's write and the exported revision"
+        );
+        store.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs PostgreSQL: INFINITY_CUBE_POSTGRES_TEST_URL"]
+    async fn stores_one_new_asset_written_twice_at_once_and_finds_it_the_second_time() {
+        let database = Fresh::new().await;
+        let store = seeded(&database, SPACE_ID, &[repository_space()]).await;
+        // The first insert waits, its row written and not committed, on an
+        // advisory lock the blocker holds.
+        database
+            .execute(
+                "CREATE FUNCTION held() RETURNS trigger LANGUAGE plpgsql AS $$ \
+                 BEGIN PERFORM pg_advisory_xact_lock_shared(3, 19); RETURN NULL; END $$; \
+                 CREATE TRIGGER held AFTER INSERT ON assets \
+                 FOR EACH ROW EXECUTE FUNCTION held();",
+            )
+            .await;
+        let mut blocker = Blocker::begin(&database).await;
+        blocker.run("SELECT pg_advisory_xact_lock(3, 19)").await;
+        let asset = StoredAsset {
+            hash: AssetHash::of(b"written twice"),
+            media_type: "text/plain".to_owned(),
+            bytes: bytes::Bytes::from_static(b"written twice"),
+        };
+        let first = spawn(&store, {
+            let asset = asset.clone();
+            |store| async move { store.store_asset(asset).await }
+        });
+        waiting(&database, 1).await;
+        let second = spawn(&store, {
+            let asset = asset.clone();
+            |store| async move { store.store_asset(asset).await }
+        });
+        // The second insert waits on the first's uncommitted row.
+        waiting(&database, 2).await;
+        blocker.commit().await;
+        assert_eq!(
+            joined(first).await,
+            Ok(AssetStored::Stored),
+            "the first write stores the asset"
+        );
+        assert_eq!(
+            joined(second).await,
+            Ok(AssetStored::Existing),
+            "the second write finds the asset the first committed"
+        );
+        assert_eq!(
+            store.load_asset(&asset.hash).await,
+            Ok(Some(asset)),
+            "the asset is stored once"
+        );
+        store.close().await;
+    }
+}
+
 /// Ports of `postgres-aggregate-initialization.test.ts`: an operation
 /// stopped at a step under the exclusive aggregate lock, and another
 /// runtime's initialization or commit observed waiting for it.
