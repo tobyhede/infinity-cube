@@ -17,7 +17,7 @@ import {
   resourceSize,
 } from '@project/core';
 import { Placement } from '@project/graph';
-import type { InPlaceEdit } from '@project/resource-api/view';
+import type { EditorSizing } from '@project/resource-api/view';
 import {
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
@@ -50,7 +50,7 @@ export interface Projection {
 
 export interface ResizeDraft {
   readonly resourceId: ResourceId;
-  readonly size: { readonly width: number; readonly height: number };
+  readonly requestedSize?: ResourceSize;
   readonly placement: Placement;
   /** The resize is of an editor, so it writes the Edit size (ADR 0178). */
   readonly editor?: true | undefined;
@@ -59,16 +59,19 @@ export interface ResizeDraft {
 const sameSize = (a: ResourceSize | undefined, b: ResourceSize | undefined): boolean =>
   a?.width === b?.width && a?.height === b?.height;
 
+function cappedSize(size: ResourceSize, cap?: ResourceSize): ResourceSize {
+  return cap === undefined
+    ? size
+    : { width: Math.min(size.width, cap.width), height: Math.min(size.height, cap.height) };
+}
+
 /**
- * The placement a canvas draws while Resources are edited in place: each
- * editor from its entry's top-left at its entry's Edit size, or, with none
- * stored, at the larger of its size hint and its size on each axis; each
- * capped at `cap`, the visible canvas (ADR 0178).
- * Nothing here is stored. With no editor drawn otherwise, the placement itself.
+ * Draw each editor at its stored Edit size or its plugin's suggested size,
+ * within the visible canvas. The Map keeps its authored placement.
  */
 export function editorPlacement(
   placement: Placement,
-  editors: ReadonlyMap<ResourceId, InPlaceEdit>,
+  editors: ReadonlyMap<ResourceId, EditorSizing>,
   cap?: ResourceSize,
 ): Placement {
   let drawn = placement;
@@ -76,16 +79,7 @@ export function editorPlacement(
     const at = drawn.get(resourceId);
     if (at === undefined) continue;
     const size = resourceSize(at);
-    const hint = editor.sizeHint;
-    const wanted =
-      at.editSize ??
-      (hint === undefined
-        ? size
-        : { width: Math.max(size.width, hint.width), height: Math.max(size.height, hint.height) });
-    const capped =
-      cap === undefined
-        ? wanted
-        : { width: Math.min(wanted.width, cap.width), height: Math.min(wanted.height, cap.height) };
+    const capped = cappedSize(at.editSize ?? editor.suggestedSize ?? size, cap);
     if (capped.width === size.width && capped.height === size.height) continue;
     drawn = Placement.place(drawn, resourceId, { ...at, size: capped });
   }
@@ -93,24 +87,24 @@ export function editorPlacement(
 }
 
 const sameEditors = (
-  a: ReadonlyMap<ResourceId, InPlaceEdit>,
-  b: ReadonlyMap<ResourceId, InPlaceEdit>,
+  a: ReadonlyMap<ResourceId, EditorSizing>,
+  b: ReadonlyMap<ResourceId, EditorSizing>,
 ): boolean =>
   a.size === b.size &&
   [...a].every(([resourceId, editor]) => {
     const other = b.get(resourceId);
-    return other !== undefined && sameSize(other.sizeHint, editor.sizeHint);
+    return other !== undefined && sameSize(other.suggestedSize, editor.suggestedSize);
   });
 
 export interface ResourceResize {
   /**
-   * The Resources edited in place on this canvas, which it draws at their Edit
+   * The Resources edited on this canvas, which it draws at their Edit
    * size and whose resize writes that size rather than their own (ADR 0178),
    * capped at `cap`, the visible canvas at the current zoom, where the canvas
    * knows one. The canvas tells it each time its plugins' Claims, its zoom or
    * its size change.
    */
-  drawEditors: (editors: ReadonlyMap<ResourceId, InPlaceEdit>, cap?: ResourceSize) => void;
+  drawEditors: (editors: ReadonlyMap<ResourceId, EditorSizing>, cap?: ResourceSize) => void;
   beginResize: (resourceId: ResourceId) => void;
   previewResize: (
     resourceId: ResourceId,
@@ -273,8 +267,8 @@ export interface RenderAdapterState {
   selection: CanvasSelection;
   /** One transient resize layered over the authored Placement. */
   resizeDraft: ResizeDraft | null;
-  /** The Resources edited in place on this canvas (`ResourceResize.drawEditors`). */
-  editors: ReadonlyMap<ResourceId, InPlaceEdit>;
+  /** The Resources edited on this canvas (`ResourceResize.drawEditors`). */
+  editors: ReadonlyMap<ResourceId, EditorSizing>;
   /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
   editorCap: ResourceSize | undefined;
   /**
@@ -537,7 +531,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         if (!sameSize(now.editorCap, cap)) {
           next.editorCap = cap;
           // The cap draws an editor at another rect, so it ends a draft of an
-          // editor for the same reason; a Resource not edited in place is
+          // editor for the same reason; a Resource not edited is
           // drawn uncapped, and its draft goes on.
           if (now.resizeDraft?.editor === true) next.resizeDraft = null;
         }
@@ -545,15 +539,13 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
 
       beginResize: (resourceId) => {
-        // The draft starts from the rect drawn, capped or not, and a release
-        // stores what it then draws: a resize of a capped editor replaces a
-        // larger stored Edit size with one derived from the cap.
+        // Pointer movement starts from the rect the author sees.
         const { editors, editorCap } = get();
         const placement = editorPlacement(authoring.mapPlacement(), editors, editorCap);
         const at = placement.get(resourceId);
         if (at === undefined) return;
         const editor = editors.has(resourceId) ? true : undefined;
-        set({ resizeDraft: { resourceId, size: resourceSize(at), placement, editor } });
+        set({ resizeDraft: { resourceId, placement, editor } });
       },
 
       previewResize: (resourceId, size) => {
@@ -561,31 +553,26 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         if (draft?.resourceId !== resourceId) return;
         const at = draft.placement.get(resourceId);
         if (at === undefined) return;
-        const proposed = { width: size.width, height: size.height };
+        const drawn = draft.editor ? cappedSize(size, get().editorCap) : size;
         set({
           resizeDraft: {
             ...draft,
-            size: proposed,
-            placement: Placement.place(draft.placement, resourceId, { ...at, size: proposed }),
+            requestedSize: size,
+            placement: Placement.place(draft.placement, resourceId, { ...at, size: drawn }),
           },
         });
       },
 
       finishResize: (resourceId) => {
-        const { resizeDraft: draft, editors } = get();
+        const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
-        // Which size a release writes follows whether the Resource is edited
-        // in place now, not when the drag began: a draft that no longer
-        // matches writes nothing.
-        if ((draft.editor === true) !== editors.has(resourceId)) {
-          set({ resizeDraft: null });
-          return;
+        if (draft.requestedSize !== undefined) {
+          authoring.complete(
+            draft.editor
+              ? { kind: 'resized-editor', resourceId, editSize: draft.requestedSize }
+              : { kind: 'resized-resource', resourceId, size: draft.requestedSize },
+          );
         }
-        authoring.complete(
-          draft.editor === true
-            ? { kind: 'resized-editor', resourceId, editSize: draft.size }
-            : { kind: 'resized-resource', resourceId, size: draft.size },
-        );
         set({ resizeDraft: null });
       },
 

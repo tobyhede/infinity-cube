@@ -1,4 +1,4 @@
-# Open and Closed that keep their size, and in-place editing at a remembered edit size
+# Display size and Edit size on a Map
 
 Status: ready-for-agent
 
@@ -12,9 +12,9 @@ An author uses one control to show a Resource's content and another to edit it, 
 
 A Resource whose plugin keeps Open and Closed keeps offering them on its Resource rail, through one control whose glyph says it changes what is shown, not the size. Opening or Closing never changes the Resource's size on that Map and never moves another Resource.
 
-The rail's Edit command starts a Markdown or Mermaid Resource's source editor in the Resource, drawn at that Resource's **Edit size** on that Map, or, when none is stored, at the room its content asks for. Its neighbours move aside while it is drawn and return when it ends. Resizing during the edit changes the Edit size and remembers it. Ending the edit, by any of the four exits, draws the Resource at its canvas size again, Open or Closed as it was before the edit began. Mermaid follows the same model through the same host source editor.
+The rail's Edit command starts a Markdown or Mermaid Resource's source editor in the Resource, drawn at that Resource's **Edit size** on that Map, or, when none is stored, at the size the plugin suggests, falling back to the Display size. Its neighbours move aside while it is drawn and return when it ends. Resizing during the edit changes the Edit size and remembers it. Ending the edit, by any of the four exits, draws the Resource at its canvas size again, Open or Closed as it was before the edit began. Mermaid follows the same model through the same host source editor.
 
-## Behaviour today, by plugin
+## Behaviour before ADR 0178, by plugin
 
 Checked against `main` (`ee471b6`) and the requirements named.
 
@@ -46,29 +46,29 @@ Checked against `main` (`ee471b6`) and the requirements named.
 
 ## Implementation Decisions
 
-ADR 0178 is the binding statement; these are the decisions as the tickets use them.
+ADR 0178 is accepted. [Proposed ADR 0182](../../docs/adr/0182-a-plugin-chooses-the-size-it-suggests-for-its-editor.md) describes the change to editor sizing used in the tickets below.
 
 - **Open and Closed stay as stored.** Markdown and Mermaid keep `{ open }` in their Map content, so no tracked file rolls forward for the display choice. Opening and Closing remain Change Map content Edits (MG-27). The rail control keeps the Open and Close labels and gets its own glyph, chosen during implementation; Title and Full were rejected as names because both collide with the glossary.
 - **Opening never resizes and commits at once.** Markdown and Mermaid stop sending a size hint when they Open, so an Open preserves the entry's size and displaces nothing, and with nothing to measure the Open commits without first reading its content. Open content keeps being clipped at the rect (RD-5, ADR 0149). The Open is still its own Edit and revision, so tests that wait for its revision (PR 490) keep working.
 - **The Edit size belongs to the canvas and is stored on the Map entry.** The entry gains an optional `editSize` (`{ width, height }`) beside `x`, `y` and `size`, accepted on an entry of any kind and refused below the Closed Size on either axis, as `size` is (MG-22), by both intakes. Export writes it.
-- **A plugin opts in on its Claim.** While a Claim that opted in is held, the canvas draws the Resource at its Edit size from the entry's top-left. A Claim that does not opt in, such as a Space Resource's, draws nothing differently. The Edit size applies wherever the Map is drawn and the Resource is edited (ADR 0112); the Stage ignores it (NV-62).
-- **With no Edit size stored, the size hint is the default.** The plugin may send a size hint with its opt-in, measured as Opening measures today; the canvas draws the editor at the larger of the hint and `size` on each axis. Beginning an edit stores nothing, and each edit measures again until an Edit size is stored. The size hint stays in the Resource API with this as its caller.
-- **The canvas keeps the editor in view.** It caps the drawn editor at the visible canvas at the current zoom, less a margin, as it caps a hint today, without changing the stored `editSize`. If the capped editor reaches past the visible canvas, the camera pans the least distance that shows it; a pan is not an Edit.
-- **Neighbours are displaced only while the editor is drawn.** The canvas applies the Resize displacement rule (MG-24) to the editor's rect and draws the Resources it passes at their displaced positions, Edges following, without storing them. Edges attach to the drawn rects. When the edit ends, everything is drawn where the Map stores it.
+- **The plugin tells the canvas when it draws an editor.** A Claim can still be used for other work without changing geometry. Editor sizing applies on any Map where the Resource is edited. The Stage ignores it (NV-62).
+- **The plugin chooses the size it suggests.** The canvas uses the stored Edit size, then the suggestion, then the Display size. Markdown and Mermaid size their real source editor once while hidden and show that same editor. A stored Edit size skips their measurement.
+- **The canvas keeps the editor in view.** It caps each drawn dimension at the visible canvas at the current zoom, less a margin, and pans the least distance to show it when editing begins or the cap changes. The cap can draw below the Closed Size.
+- **Neighbours and Edges follow the drawn editor.** Apply the Resize displacement rule (MG-24) from the Display rect to the settled editor rect, including shrinking axes. A resize previews only the subject (ADR 0173). Release recomputes displacement. Dragging a displaced neighbour adds the drag delta to its stored position.
 - **Resizing during an edit writes the Edit size, not the size.** It uses the Resize control's rules (Closed Size floor, Shift keeps proportions, ADR 0173), and each completed gesture is one Edit that writes `editSize`, independent of the draft: Save and Cancel both keep it. `size` keeps governing the canvas outside an edit, and normal Resize keeps its displacement rules (MG-23–MG-26).
 - **The plugin decides how its edit works and holds its Claim.** Markdown and Mermaid reuse the host's source editor and their Save and Cancel commands, keep the four exits (UI-56), the keyboard hints (UI-57) and the caret behaviour (UI-58, UI-59), and return focus as today. Save commits the Resource content; Cancel and Escape discard the draft.
 - **Edit no longer composes Open.** Edit on a Closed Resource begins editing without committing Open: the plugin reads its text for that edit only and draws the editor, and when the edit ends the Resource is drawn Closed again. This replaces UI-54's "Opens it, then begins editing" and UI-56's "every exit leaves the Resource Open". If the text cannot be read, no edit begins and nothing is committed.
 - **The Open and Close control is unavailable while editing**, in its place on the rail, as Close is today (UI-55).
 - **Closed still avoids work.** A Closed Resource reads nothing and mounts nothing, as today.
 - **Editing is not stored.** A reload ends an edit and its local draft (ADR 0042); the Resource comes back Open or Closed as stored, and only the Edit size carries over.
-- **The rail's Edit stays each plugin's own Content action.** The Edit size belongs to plugins that edit in place (Markdown and Mermaid). Space keeps its Edit, a Claim for authoring its drawn Map while Open, without opting in; Reference keeps having none.
+- **The rail’s Edit stays each plugin’s own Content action.** Markdown and Mermaid draw source editors. Space uses its Claim to author its drawn Map. Reference offers no Edit.
 - **The requirements follow by refresh.** ADR 0178 edits no requirements document; the next snapshot refresh (ADR 0175) folds it into maps-and-graphs.md, rendering.md and ui.md. CONTEXT.md gains **Edit size** with the ADR.
 
 ## Testing Decisions
 
 - Drive the Resource rail, the source editor and the resize handle through the existing application Playwright fixtures. Assert what the author sees and what the Map keeps after switching Maps or reloading. Use the existing Markdown source helpers and the Mermaid Resource tests as prior art.
 - Cover Open to Closed and back at the Closed Size and at an authored size, checking the rect and a neighbouring Resource's position. Cover beginning an edit Open and Closed, resizing during an edit, Save and Cancel, and beginning again at the remembered edit size. Use the same Resource on two Maps to show they keep separate settings.
-- Show that an entry with no `editSize` draws the editor at the larger of the size hint and its canvas size, and stores nothing until resized. Show neighbours drawn aside during the edit and back after it, with nothing stored. Add intake corpus cases for `editSize` (accepted on several kinds, below the Closed Size, and the wrong shape) so both intakes are held to it.
+- Show that an entry with no `editSize` draws the editor at the suggestion, including one smaller than its Display size, and stores nothing until resized. Show neighbours drawn aside during the edit and back after it, with their stored positions preserved. Add intake corpus cases for `editSize` (accepted on several kinds, below the Closed Size, and the wrong shape) so both intakes are held to it.
 - Use the existing Resource Ladle stories as prior art for rail accessibility and resize behaviour, and keep the prototype story as the reference for the interaction until the implementation replaces it.
 
 ## Out of Scope
@@ -76,7 +76,7 @@ ADR 0178 is the binding statement; these are the decisions as the tickets use th
 - Focus surfaces and a separate editor window.
 - A shared rule for fixed-size editors, or plugin control over whether the canvas lets a Resource be resized.
 - Editing changes for Image, Ur, Reference and Space. Any Open support for Image needs its own decision.
-- **Use editor size on Map**, a proposed one-time copy of the edit size to the entry's size. If pursued, it runs as a normal Resize from the Resource's Actions menu, with its displacement; Undo reverses it and Cancel still discards the draft. Whether a plugin offers it depends on its having a resizable in-place editor.
+- **Use editor size on Map**, a proposed one-time copy of the edit size to the entry's size. If pursued, it runs as a normal Resize from the Resource's Actions menu, with its displacement; Undo reverses it and Cancel still discards the draft. Whether a plugin offers it depends on its having a resizable editor.
 
 ## Further Notes
 

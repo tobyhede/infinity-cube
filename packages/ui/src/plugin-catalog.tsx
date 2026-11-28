@@ -91,8 +91,8 @@ export interface PluginOperations {
   /**
    * A Claim for the drawing keyed `drawing`: a key the surface mints for its
    * own lifetime, so two drawings of one Resource never share a Claim. A
-   * Claim taken with `options.inPlace` edits in place (ADR 0178): the canvas
-   * draws the Resource at its Edit size while it is held.
+   * plugin can request editor geometry with `options.editor` and suggest its
+   * own dimensions when the Map has no stored Edit size.
    */
   readonly claim?:
     ((drawing: symbol, options?: ClaimOptions) => PluginHostClaim | undefined) | undefined;

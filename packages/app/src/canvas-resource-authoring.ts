@@ -117,8 +117,7 @@ export interface CanvasResourceAuthoringInput {
   readonly mapEmbedding?: MapEmbedding | undefined;
   /**
    * The most an editor on this canvas is drawn at: the visible canvas at the
-   * current zoom, less a margin (ADR 0178). Only the canvas's own Map offers
-   * it; absent, an editor is drawn uncapped.
+   * current zoom, less a margin. A canvas awaiting measurement omits it.
    */
   readonly editorCap?: Size | undefined;
 }
@@ -181,7 +180,7 @@ export function useCanvasResourceAuthoring({
     const drawing = held.at(-1);
     return drawing !== undefined && !lent.has(drawing.key);
   });
-  // A plugin that took its Claim to edit in place is drawn at its Edit size,
+  // A plugin that took its Claim to edit is drawn at its Edit size,
   // and resized as an editor, until the Claim ends (ADR 0178). The render
   // adapter is told in a layout effect. The canvas then lays the new placement
   // out through `usePlacementRendering`, an effect and a microtask later, so a

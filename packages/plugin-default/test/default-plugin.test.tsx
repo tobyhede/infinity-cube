@@ -41,7 +41,7 @@ describe('the default plugin’s view', () => {
       content: [],
       map: [],
       stored: [],
-      claims: { taken: 0, released: 0, inPlace: [] },
+      claims: { taken: 0, released: 0, editors: [] },
       exclusive: 0,
       picked: 0,
     });

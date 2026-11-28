@@ -36,25 +36,16 @@ import {
  * The Markdown plugin's view (ADR 0020, ADR 0064, ADR 0142). It draws its
  * Title, and its text once that asset is read, where its Map content says it
  * is Open. Open and Close are its rail commands, each one Map content commit
- * that changes no size (ADR 0178). Editing is its own mode, drawn in place: a
- * Claim, the source editor, a draft, and four ways out (Save, `Mod-Enter`,
- * Cancel, `Escape`), Save storing the text and committing its URL. A click
- * elsewhere leaves the draft up. Where the Map stores no Edit size, the Claim
- * carries a size hint for the text read at a reading width, once its images
- * and fonts have loaded.
+ * that changes no size (ADR 0178). Editing is its own mode: a Claim, the source editor, a draft, and
+ * four ways out (Save, `Mod-Enter`, Cancel, `Escape`), Save storing the text
+ * and committing its URL. A click elsewhere leaves the draft up.
  */
-
-/** The width the size hint asks for at least, so a document reads at a line length. */
-export const READING_WIDTH = 640;
 
 /** The inset the text is drawn at inside the rect. */
 const INSET = 12;
 
 /** The room a Closed Title keeps below it, which an Open one does not. */
 const CLOSED_FOOT = 8;
-
-/** How long an edit waits for the text's images to load before measuring without them. */
-const LOAD_WAIT = 2000;
 
 /** The text of the asset at a URL, as far as it has been read. */
 type Text =
@@ -147,40 +138,11 @@ const createKnownText = (): KnownText => {
 };
 
 /**
- * Resolve once every image in `element` has loaded or failed, and the fonts
- * it is set in are ready, or after {@link LOAD_WAIT}, whichever is first.
- * Its listeners and timer go when `signal` aborts, and the timer when it
- * resolves.
- */
-const laidOut = (element: HTMLElement, signal: AbortSignal): Promise<void> => {
-  const pending = [...element.querySelectorAll('img')]
-    .filter((image) => !image.complete)
-    .map(
-      (image) =>
-        new Promise<void>((resolve) => {
-          image.addEventListener('load', () => resolve(), { once: true, signal });
-          image.addEventListener('error', () => resolve(), { once: true, signal });
-        }),
-    );
-  // A document without a font loading interface, as jsdom's, has no fonts to wait for.
-  const document: Partial<Pick<Document, 'fonts'>> = element.ownerDocument;
-  if (document.fonts !== undefined) pending.push(document.fonts.ready.then(() => undefined));
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const stop = () => clearTimeout(timer);
-  signal.addEventListener('abort', stop, { once: true });
-  return Promise.race([
-    Promise.all(pending).then(() => undefined),
-    new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, LOAD_WAIT);
-    }),
-  ]).finally(stop);
-};
-
-/**
  * A running edit: the draft, the text it is measured against, which is the
  * text the edit began from or last Saved, and whether a Save is under way.
  */
 interface Editing {
+  readonly claim: Claim | undefined;
   readonly draft: string;
   readonly base: string;
   readonly saving: boolean;
@@ -214,23 +176,11 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const takeClaim = surface.claim;
   const [refusal, setRefusal] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
-  const claim = useRef<Claim | null>(null);
-  const [measuring, setMeasuring] = useState(false);
-  const measurer = useRef<HTMLDivElement | null>(null);
+  const titleRow = useRef<HTMLDivElement>(null);
   const railBand = useRailBand();
 
-  // A release is asked once: the host completes one asked during exclusive
-  // work or an inner Claim when that ends.
-  const release = useCallback(() => {
-    claim.current?.release();
-    claim.current = null;
-  }, []);
-  // Every way an edit ends releases its Claim, and an unmounted view holds
-  // nothing; the host releases its Claims too.
-  useEffect(() => {
-    if (editing === null) release();
-  }, [editing, release]);
-  useEffect(() => release, [release]);
+  const claim = editing?.claim;
+  useEffect(() => () => claim?.release(), [claim]);
 
   const readable = text.state === 'read' ? text.text : null;
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
@@ -240,66 +190,27 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   const mayEditClosed = !open && mayAuthor && mapCommit !== undefined;
   const editWhenOpen = useRef(false);
 
-  const startEdit = useCallback(
-    (sizeHint?: Size) => {
-      if (!mayEdit || editing !== null) return;
-      // Taken to edit in place: the canvas draws the editor at the Edit size it
-      // keeps for this Map while the Claim is held, or, with none stored, at
-      // the larger of the hint and its size, capped at the visible canvas
-      // (ADR 0178; the app's `render-adapter.test.ts` holds it).
-      const held = takeClaim(sizeHint === undefined ? { inPlace: {} } : { inPlace: { sizeHint } });
-      if (held === undefined) return;
-      claim.current = held;
-      setRefusal(null);
-      // Measured as Save stores it, so a text stored with other line endings
-      // is unchanged until its draft is.
-      setEditing({ draft: readable, base: lineFeedText(readable), saving: false });
-    },
-    [mayEdit, editing, takeClaim, readable],
-  );
-
-  // With an Edit size stored, the edit begins at once; with none, the text is
-  // measured at a reading width first and the hint goes with the Claim, so
-  // each edit measures again until an Edit size is stored (ADR 0178).
-  const editSize = surface.editSize;
   const beginEdit = useCallback(() => {
-    if (!mayEdit || editing !== null || measuring) return;
-    if (editSize !== undefined) startEdit();
-    else setMeasuring(true);
-  }, [mayEdit, editing, measuring, editSize, startEdit]);
-  const width = Math.max(surface.size.width, READING_WIDTH);
-  const beginning = useRef({ startEdit, width });
-  useEffect(() => {
-    beginning.current = { startEdit, width };
-  }, [startEdit, width]);
-  useEffect(() => {
-    if (!measuring) return undefined;
-    const element = measurer.current;
-    const measured = new AbortController();
-    const { signal } = measured;
-    void (element === null ? Promise.resolve() : laidOut(element, signal)).then(() => {
-      if (signal.aborted) return;
-      setMeasuring(false);
-      const now = beginning.current;
-      if (element === null) {
-        now.startEdit();
-        return;
-      }
-      // The measurer draws the Title as an Open one is drawn, above the text,
-      // both at the width the hint asks for.
-      const height = element.scrollHeight + 2 * INSET;
-      now.startEdit({ width: Math.round(now.width), height: Math.round(height) });
-    });
-    return () => measured.abort();
-  }, [measuring]);
+    if (!mayEdit || editing !== null) return;
+    const held = surface.editSize === undefined ? undefined : takeClaim({ editor: {} });
+    if (surface.editSize !== undefined && held === undefined) return;
+    setRefusal(null);
+    setEditing({ draft: readable, base: lineFeedText(readable), saving: false, claim: held });
+  }, [mayEdit, editing, takeClaim, readable, surface.editSize]);
+
+  const suggestEditorSize = (source: Size) => {
+    const suggestedSize = {
+      width: source.width,
+      height: source.height + (titleRow.current?.offsetHeight ?? 0),
+    };
+    const held = takeClaim?.({ editor: { suggestedSize } });
+    setEditing((now) => (now === null || held === undefined ? null : { ...now, claim: held }));
+  };
 
   const end = useCallback(() => setEditing(null), []);
 
-  // A Resource Closed elsewhere while its draft was up has nowhere to draw it,
-  // and one Closed while its edit was still being measured begins no edit, so
-  // a later Open begins none until Edit is pressed again.
+  // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
   if (editing !== null && !open) setEditing(null);
-  if (measuring && !open) setMeasuring(false);
 
   // An Edit asked for while Closed begins once the Open it caused has landed
   // and the text is read, and where the text cannot be read says it cannot.
@@ -314,7 +225,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
   }, [open, text.state, beginEdit]);
 
   const save = useCallback(() => {
-    if (editing === null || editing.saving) return;
+    if (editing?.claim === undefined || editing.saving) return;
     if (contentCommit === undefined || store === undefined) return;
     const next = lineFeedText(editing.draft);
     if (next === editing.base) {
@@ -322,7 +233,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       return;
     }
     const saved = editing.draft;
-    setEditing({ draft: saved, base: editing.base, saving: true });
+    setEditing({ ...editing, saving: true });
     // The editor stays live while a Save runs: text typed meanwhile is a new
     // draft, which a Save that lands leaves up rather than discarding.
     const settle = (refused: string | null): void => {
@@ -330,7 +241,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       setEditing((now) =>
         now === null || (refused === null && now.draft === saved)
           ? null
-          : { draft: now.draft, base: refused === null ? next : now.base, saving: false },
+          : { ...now, base: refused === null ? next : now.base, saving: false },
       );
     };
     void store(new Blob([next], { type: MARKDOWN_MEDIA_TYPE }))
@@ -394,7 +305,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
                 label: `Save Resource ${name}`,
                 icon: <Check size={14} />,
                 run: save,
-                disabled: editing.saving,
+                disabled: editing.claim === undefined || editing.saving,
                 keyshortcuts: 'Meta+Enter Control+Enter',
               },
             ]),
@@ -487,6 +398,7 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
       data-editing={editing !== null}
     >
       <div
+        ref={titleRow}
         style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
       >
         <Title />
@@ -519,7 +431,8 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
                   setEditing((now) => (now === null ? now : { ...now, draft }))
                 }
                 ariaLabel={`Markdown source of ${name}`}
-                autoFocus
+                autoFocus={editing.claim !== undefined}
+                onSuggestedSize={editing.claim === undefined ? suggestEditorSize : undefined}
                 onSave={save}
                 onCancel={escape}
               />
@@ -545,25 +458,6 @@ function MarkdownView({ surface }: PluginViewProps<MarkdownContent, MarkdownMapC
         <p role="alert" style={{ margin: 0, padding: `0 ${INSET}px`, fontSize: 12 }}>
           {refusal}
         </p>
-      )}
-      {measuring && readable !== null && (
-        <div
-          ref={measurer}
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width,
-            visibility: 'hidden',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{ padding: `${railBand}px ${INSET}px 0` }}>
-            <Title />
-          </div>
-          <RenderedMarkdown markdown={readable} drawnName={name} />
-        </div>
       )}
       <Rail commands={commands} />
     </div>

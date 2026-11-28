@@ -350,13 +350,13 @@ describe('the plugin gate', () => {
   });
 });
 
-describe('a Claim taken to edit in place (ADR 0178)', () => {
+describe('a Claim taken to edit (ADR 0178)', () => {
   const HINT = { width: 640, height: 360 };
 
   it('keeps the drawing an editor while its Claim is held, and drops it however the Claim ends', () => {
     const gate = createPluginGate();
-    const held = gate.claim([A], () => null, { sizeHint: HINT });
-    expect(gate.editors()).toEqual(new Map([[A.key, { sizeHint: HINT }]]));
+    const held = gate.claim([A], () => null, { suggestedSize: HINT });
+    expect(gate.editors()).toEqual(new Map([[A.key, { suggestedSize: HINT }]]));
     held?.release();
     expect(gate.editors().size).toBe(0);
     gate.claim([A], () => null, {});
@@ -399,9 +399,9 @@ describe('a Claim taken to edit in place (ADR 0178)', () => {
     const outer = { resource: 'space', key: Symbol('space') };
     gate.claim([outer], () => null);
     const inside = { resource: 'note', key: Symbol('note') };
-    gate.claim([outer, inside], () => null, { sizeHint: HINT });
+    gate.claim([outer, inside], () => null, { suggestedSize: HINT });
     expect(editorsOn(gate.getState(), gate.editors(), [outer])).toEqual(
-      new Map([['note', { sizeHint: HINT }]]),
+      new Map([['note', { suggestedSize: HINT }]]),
     );
     // The canvas the Space Resource is drawn on draws the note in no rect of its own.
     expect(editorsOn(gate.getState(), gate.editors(), []).size).toBe(0);
@@ -866,14 +866,14 @@ describe('a plugin surface’s commits on the canvas', () => {
     expect(second.claimHolder?.(secondDrawing)).toBe('none');
   });
 
-  it('takes a Claim to edit in place for the drawing on this canvas, with its size hint', () => {
+  it('takes a Claim to edit for the drawing on this canvas, with its suggested size', () => {
     const host = hostWith(() => ({ kind: 'completed' }));
     const drawing = Symbol('drawing');
     const held = pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.(drawing, {
-      inPlace: { sizeHint: { width: 640, height: 360 } },
+      editor: { suggestedSize: { width: 640, height: 360 } },
     });
     expect(editorsOn(host.gate.getState(), host.gate.editors(), [])).toEqual(
-      new Map([[RESOURCE, { sizeHint: { width: 640, height: 360 } }]]),
+      new Map([[RESOURCE, { suggestedSize: { width: 640, height: 360 } }]]),
     );
     held?.release();
     pluginSurfaceOperations('markdown', RESOURCE, FACTS, host).claim?.(drawing);

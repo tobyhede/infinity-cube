@@ -88,47 +88,38 @@ describe('a Markdown Resource drawn by the application', () => {
     expect(commitMap).toHaveBeenCalledWith({ open: true });
   });
 
-  it('measures its text for an edit once its images have loaded, where no Edit size is stored (ADR 0178)', async () => {
-    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
-    try {
-      const claim = vi.fn((_owner: symbol, _options?: ClaimOptions): PluginHostClaim => ({
+  it('reveals the same source editor that suggested the size, without loading a preview image', async () => {
+    let measured: Element | null = null;
+    const claim = vi.fn((_owner: symbol, _options?: ClaimOptions): PluginHostClaim => {
+      measured = document.querySelector('.cm-content');
+      return {
         release: () => undefined,
         exclusively: () => Promise.resolve('busy'),
         unmount: () => undefined,
-      }));
-      render(
-        <WithTexts>
-          <PluginResource
-            {...onTheMap({
-              state: 'selected',
-              content: { url: textAsset('# Notes\n\n![Chart](https://example.com/chart.png)') },
-              mapContent: { open: true },
-              operations: {
-                kind: 'markdown',
-                commitContent: () => Promise.resolve<Answer>('completed'),
-                commitStore: () => Promise.resolve(textAsset('stored')),
-                claim,
-              },
-            })}
-          />
-        </WithTexts>,
-      );
-      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-      const image = await waitFor(() => {
-        const drawn = document.querySelector('[aria-hidden="true"] img');
-        if (drawn === null) throw new Error('The text was not drawn to be measured.');
-        return drawn;
-      });
-      await act(() => Promise.resolve());
-      expect(claim).not.toHaveBeenCalled();
-      fireEvent.load(image);
-      await waitFor(() => expect(claim).toHaveBeenCalledTimes(1));
-      const hint = claim.mock.calls[0]?.[1]?.inPlace?.sizeHint;
-      expect(hint?.width).toBe(640);
-      expect(hint?.height).toBeGreaterThan(0);
-    } finally {
-      complete.mockRestore();
-    }
+      };
+    });
+    render(
+      <WithTexts>
+        <PluginResource
+          {...onTheMap({
+            state: 'selected',
+            content: { url: textAsset('# Notes\n\n![Chart](https://example.com/chart.png)') },
+            mapContent: { open: true },
+            operations: {
+              kind: 'markdown',
+              commitContent: () => Promise.resolve<Answer>('completed'),
+              commitStore: () => Promise.resolve(textAsset('stored')),
+              claim,
+            },
+          })}
+        />
+      </WithTexts>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    const editor = await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
+    expect(editor).toBe(measured);
+    expect(editor).toBeVisible();
+    expect(claim).toHaveBeenCalledTimes(1);
   });
 
   it('keeps no band clear for a rail on the Stage, which draws none', async () => {

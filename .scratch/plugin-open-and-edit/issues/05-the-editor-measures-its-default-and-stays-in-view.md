@@ -1,14 +1,14 @@
-# 05: The editor measures its default and stays in view
+# 05: The plugin suggests an editor size and the canvas keeps the editor in view
 
 **Status:** ready-for-agent
 
 **Blocked by:** 03, 04
 
-**What to build:** the default Edit size and keeping the editor visible ([ADR 0178](../../../docs/adr/0178-opening-keeps-a-resources-size-and-an-in-place-editor-draws-at-an-edit-size-the-map-stores.md)). When a plugin opts in on an entry with no `editSize`, it sends a size hint measured as its Open measured before ticket 03, and the canvas draws the editor at the larger of the hint and `size` on each axis, storing nothing; each edit measures again until an Edit size is stored. The canvas caps the drawn editor at the visible canvas at the current zoom, less a margin, as `packages/app/src/visible-canvas-cap.ts` capped an Open's hint until ticket 03 removed it (it is in git history), without changing a stored `editSize`. If the capped editor reaches past the visible canvas, the camera pans the least distance that shows it, which is not an Edit.
+**What to build:** Implement the sizing contract in [proposed ADR 0182](../../../docs/adr/0182-a-plugin-chooses-the-size-it-suggests-for-its-editor.md). A plugin identifies the editor it draws and may suggest dimensions. It chooses how to obtain them. Markdown and Mermaid use the real source editor. With no Edit size stored, they lay it out hidden, read its width and height once, then show the same editor. A stored Edit size skips measurement.
 
 ## Acceptance
 
-- [ ] Markdown and Mermaid send their measured hint with the opt-in when no `editSize` is stored, and none when one is; a Mermaid diagram that has not drawn in time sends none.
-- [ ] With no `editSize`, the editor draws at the per-axis larger of the hint and `size`, and beginning an edit makes no revision.
-- [ ] A stored `editSize` larger than the visible canvas draws capped and stays stored unchanged; zooming out draws more of it.
-- [ ] An editor that would reach past the visible canvas pans the camera by the least distance, with no Edit.
+- [ ] A test follows the same source editor from measurement through typing. A browser test checks that changing the saved source changes the next editor’s width and height. The suggestion stays fixed as the author types. Sizing works without loading rendered output.
+- [ ] The canvas draws the stored Edit size, then falls back to the suggestion, then to the Display size. A suggestion smaller than the Display size remains smaller. Beginning an edit writes no revision. Holding a Claim for other work preserves the Display size.
+- [ ] Each drawn dimension fits the visible canvas at the current zoom, less a margin. Zooming out reveals more of an oversized stored Edit size. The stored value survives changes to the cap.
+- [ ] When editing begins or the cap changes, the camera pans the least distance to show the editor. Moving or resizing the editor alone leaves the camera in place.

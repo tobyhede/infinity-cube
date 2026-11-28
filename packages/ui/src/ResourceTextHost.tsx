@@ -65,6 +65,7 @@ export function HostRenderedMarkdown({
  * stops a click-drag panning the canvas; the wheel stays the canvas's.
  */
 export function HostSourceEditor({
+  onSuggestedSize,
   value,
   onValueChange,
   ariaLabel,
@@ -73,6 +74,7 @@ export function HostSourceEditor({
   onCancel,
   className,
 }: SourceEditorProps) {
+  const body = useRef<HTMLDivElement>(null);
   const handle = useRef<MarkdownSourceEditorHandle | null>(null);
   /**
    * Whether the caret is still to be placed. The editor may arrive behind
@@ -108,13 +110,24 @@ export function HostSourceEditor({
     <div
       className={cn(
         'markdown-resource-body markdown-resource-body--editing nodrag nopan',
+        onSuggestedSize !== undefined && 'markdown-resource-body--sizing',
         className,
       )}
+      ref={body}
       onKeyDown={onKeyDown}
     >
       <Suspense fallback={<div className="markdown-resource-body__pending" aria-hidden="true" />}>
         <MarkdownSourceEditor
           ref={receive}
+          onReady={
+            onSuggestedSize === undefined
+              ? undefined
+              : () => {
+                  const element = body.current;
+                  if (element !== null)
+                    onSuggestedSize({ width: element.offsetWidth, height: element.offsetHeight });
+                }
+          }
           className="markdown-resource-body__source"
           value={value}
           ariaLabel={ariaLabel}

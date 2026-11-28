@@ -138,10 +138,13 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
 
   const sized = nodeByTitle(page, 'Sized').first();
   const rect = async () =>
-    sized.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
-    }));
+    sized.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      return {
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      };
+    });
   const source = page.getByRole('textbox', { name: 'Mermaid source of Sized' });
   const edit = async () => {
     await (
@@ -161,11 +164,17 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   };
   const size = await rect();
 
-  // With no Edit size stored, the editor is drawn at the larger of the
-  // plugin's hint and the size on each axis (ADR 0178): the reading width.
+  // The empty source takes the plugin's suggestion. A longer draft keeps
+  // that size until a later edit measures the saved source again.
   await edit();
-  await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
-  expect((await rect()).height).toBeGreaterThanOrEqual(size.height);
+  await expect.poll(rect).not.toEqual(size);
+  const initial = await rect();
+  await source.fill('flowchart LR\n  Short --> A_longer_destination');
+  expect(await rect()).toEqual(initial);
+  await source.press(`${PRIMARY_MODIFIER}+Enter`);
+  await expect(source).toHaveCount(0);
+  await edit();
+  await expect.poll(async () => (await rect()).width).toBeGreaterThan(initial.width);
   const measured = await rect();
 
   // A resize while editing writes the Edit size, and leaves the size alone.
@@ -195,6 +204,3 @@ test('an edit draws a Mermaid Resource at its Edit size, which a resize writes a
   await edit();
   await expect.poll(rect).toEqual(edited);
 });
-
-/** The width the Mermaid plugin's size hint asks for. */
-const READING_WIDTH = 640;

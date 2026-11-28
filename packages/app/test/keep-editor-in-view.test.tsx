@@ -1,3 +1,5 @@
+import { ReactFlowProvider } from '@xyflow/react';
+import { useEmbeddedEditorCamera } from '../src/embedded-editor-camera';
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceId } from '@project/core';
@@ -110,5 +112,34 @@ describe('keeping an editor in view (ADR 0178)', () => {
       rect: { x: 10, y: 20, width: 640, height: 360 },
     });
     expect(editorToShow(drawn, new Map())).toBeUndefined();
+  });
+});
+
+describe('keeping an editor visible inside a Space Resource', () => {
+  it('pans within the clipped window and restores its stored framing when editing ends', () => {
+    const bounds = { left: 20, right: 520, top: 30, bottom: 430 };
+    const camera = { zoom: 2, offset: { x: 10, y: 20 } };
+    const cap = { width: 404, height: 304 };
+    const drawn = Placement.fromEntries([[RESOURCE, { x: 200, y: 190, size: cap }]]);
+    const { result, rerender } = renderHook(
+      ({ editing }) =>
+        useEmbeddedEditorCamera(bounds, { x: 0, y: 0 }, camera, {
+          editors: editing ? new Map([[RESOURCE, {}]]) : new Map(),
+          drawnPlacement: drawn,
+          editorCap: cap,
+        }),
+      {
+        initialProps: { editing: true },
+        wrapper: ({ children }) => (
+          <ReactFlowProvider initialWidth={1000} initialHeight={800}>
+            {children}
+          </ReactFlowProvider>
+        ),
+      },
+    );
+    expect(result.current.cap).toEqual(cap);
+    expect(result.current.camera).toEqual({ zoom: 2, offset: { x: -332, y: -302 } });
+    rerender({ editing: false });
+    expect(result.current.camera).toEqual(camera);
   });
 });

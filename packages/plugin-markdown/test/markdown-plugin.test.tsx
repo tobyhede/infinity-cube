@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { EMPTY_ASSET, lineFeedText, type AssetRef } from '@project/resource-api/domain';
 import { renderPlugin } from '@project/resource-api/view/testing';
 import {
@@ -7,7 +7,7 @@ import {
   type MarkdownContent,
   type MarkdownMapContent,
 } from '@project/plugin-markdown/domain';
-import { markdownPluginView, READING_WIDTH } from '@project/plugin-markdown/view';
+import { markdownPluginView } from '@project/plugin-markdown/view';
 
 const TEXT_REF: AssetRef = '/assets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const SAVED_REF: AssetRef = '/assets/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA';
@@ -58,7 +58,6 @@ describe('the Markdown plugin’s domain half', () => {
 describe('the Markdown plugin’s view', () => {
   it('draws its Title and nothing else when Closed, offering nothing with every capability absent', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -73,7 +72,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('draws its text in full when Open with no commit, as on the Stage', async () => {
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -85,7 +83,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('draws a note and offers no Edit when its text cannot be read', async () => {
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -99,7 +96,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('Opens with one Map content commit, before its text is read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -116,41 +112,13 @@ describe('the Markdown plugin’s view', () => {
     expect(rendered.commits.map).toEqual([open, closed]);
   });
 
-  it('measures its text at a reading width for the Claim where the Map stores no Edit size (ADR 0178)', async () => {
-    const rendered = renderPlugin(markdownPluginView.View, {
-      content,
-      map: open,
-      title: 'Notes',
-      grants: editable,
-      size: { width: 300, height: 200 },
-      assets: reading({ [TEXT_REF]: 'Old' }),
-    });
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-    expect(await screen.findByRole('textbox', { name: 'Markdown source of Notes' })).toHaveValue(
-      'Old',
-    );
-    const [inPlace, ...others] = rendered.commits.claims.inPlace;
-    expect(others).toEqual([]);
-    expect(inPlace?.sizeHint?.width).toBe(READING_WIDTH);
-    expect(inPlace?.sizeHint?.height).toBeGreaterThan(0);
-    // Beginning an edit is not an Edit.
-    expect(rendered.commits.map).toEqual([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
-    // Each edit measures again while no Edit size is stored.
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-    await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
-    expect(rendered.commits.claims.inPlace).toHaveLength(2);
-    expect(rendered.commits.claims.inPlace[1]?.sizeHint?.width).toBe(READING_WIDTH);
-  });
-
-  it('abandons an edit still measuring when it is Closed, so a later Open begins none', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    // Fonts that never finish loading, so the measurement waits out its time
-    // limit; jsdom has no font loading interface of its own.
-    Object.defineProperty(document, 'fonts', {
-      configurable: true,
-      value: { ready: new Promise<never>(() => undefined) },
-    });
+  it('suggests the source editor’s dimensions once per edit without a stored Edit size', async () => {
+    const width = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
+      .mockReturnValue(431);
+    const height = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(187);
     try {
       const rendered = renderPlugin(markdownPluginView.View, {
         content,
@@ -160,32 +128,25 @@ describe('the Markdown plugin’s view', () => {
         assets: reading({ [TEXT_REF]: 'Old' }),
       });
       fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Close Resource Notes' }));
-      fireEvent.click(await screen.findByRole('button', { name: 'Open Resource Notes' }));
-      await screen.findByRole('button', { name: 'Close Resource Notes' });
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(4000);
+      const editor = await screen.findByRole('textbox');
+      expect(width.mock.contexts).toEqual([editor]);
+      expect(height.mock.contexts).toEqual([editor]);
+      fireEvent.change(editor, { target: { value: 'A different draft' } });
+      expect(screen.getByRole('textbox')).toBe(editor);
+      expect(rendered.commits.claims.editors).toEqual([
+        { suggestedSize: { width: 431, height: 187 } },
+      ]);
+      fireEvent.keyDown(editor, { key: 'Escape' });
+      width.mockReturnValue(515);
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+      expect(rendered.commits.claims.editors[1]).toEqual({
+        suggestedSize: { width: 515, height: 187 },
       });
-      expect(screen.queryByRole('textbox', { name: 'Markdown source of Notes' })).toBeNull();
-      expect(rendered.commits.claims.inPlace).toEqual([]);
+      expect(rendered.commits.map).toEqual([]);
     } finally {
-      Reflect.deleteProperty(document, 'fonts');
-      vi.useRealTimers();
+      width.mockRestore();
+      height.mockRestore();
     }
-  });
-
-  it('measures at its own width where that is wider than the reading width', async () => {
-    const rendered = renderPlugin(markdownPluginView.View, {
-      content,
-      map: open,
-      title: 'Notes',
-      grants: editable,
-      size: { width: 900, height: 200 },
-      assets: reading({ [TEXT_REF]: 'Old' }),
-    });
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-    await screen.findByRole('textbox', { name: 'Markdown source of Notes' });
-    expect(rendered.commits.claims.inPlace[0]?.sizeHint?.width).toBe(900);
   });
 
   it('Saves by storing the text with `\\n` endings, then committing its URL, and releases its Claim', async () => {
@@ -213,8 +174,8 @@ describe('the Markdown plugin’s view', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
     expect(rendered.commits.claims.taken).toBe(1);
-    // Its edit is drawn in place, at the Edit size the canvas keeps (ADR 0178).
-    expect(rendered.commits.claims.inPlace).toEqual([{}]);
+    // A stored Edit size needs no suggestion.
+    expect(rendered.commits.claims.editors).toEqual([{}]);
     const editor = screen.getByRole('textbox', { name: 'Markdown source of Notes' });
     expect(editor).toHaveValue('Old');
     fireEvent.change(editor, { target: { value: 'New\r\nline' } });
@@ -229,7 +190,6 @@ describe('the Markdown plugin’s view', () => {
   it('Saves nothing for an unchanged draft of a text stored with `\\r\\n` endings', async () => {
     const store = vi.fn(() => Promise.resolve(SAVED_REF));
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -245,7 +205,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('keeps the draft up when the store is refused, and commits nothing', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -266,7 +225,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('keeps the draft up when the content commit is refused', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -301,7 +259,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(rendered.commits.content).toEqual([]);
-    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, inPlace: [{}, {}] });
+    expect(rendered.commits.claims).toEqual({ taken: 2, released: 2, editors: [{}, {}] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', metaKey: true });
@@ -310,7 +268,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('begins an edit from a press on its selected body', async () => {
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -324,7 +281,6 @@ describe('the Markdown plugin’s view', () => {
   it('keeps the draft up and Save available again when the store rejects', async () => {
     let stores = 0;
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -351,7 +307,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('draws a note, and still Opens, when reading its text rejects', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -366,7 +321,6 @@ describe('the Markdown plugin’s view', () => {
   it('reads its text again on a later Open after an earlier read failed', async () => {
     let readable = false;
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -391,7 +345,6 @@ describe('the Markdown plugin’s view', () => {
   it('begins an Edit from Closed, after an earlier read failed, once its text reads', async () => {
     let readable = false;
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -417,7 +370,6 @@ describe('the Markdown plugin’s view', () => {
   it('keeps editing what was typed while a Save was under way', async () => {
     let finish: (ref: AssetRef) => void = () => undefined;
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -446,7 +398,6 @@ describe('the Markdown plugin’s view', () => {
   it('ignores Escape while a Save is under way, so a refused Save keeps its draft', async () => {
     let finish: (answer: { readonly refused: string }) => void = () => undefined;
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: open,
       title: 'Notes',
@@ -471,7 +422,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('offers Edit when Closed, which Opens it and then begins editing', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -488,7 +438,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('Opens but begins no edit from Closed when its text cannot be read', async () => {
     const rendered = renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -521,7 +470,7 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
 
   it('keeps its draft and Claim while authoring is withdrawn, and Saves once it returns', async () => {
@@ -545,11 +494,10 @@ describe('the Markdown plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
     await screen.findByRole('button', { name: 'Edit Resource Notes' });
     expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
-    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, inPlace: [{}] });
+    expect(rendered.commits.claims).toEqual({ taken: 1, released: 1, editors: [{}] });
   });
   it('keeps focus on its Open command as it becomes Close, and back', async () => {
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -566,7 +514,6 @@ describe('the Markdown plugin’s view', () => {
 
   it('draws its kind glyph, named for a screen reader, only while Closed', async () => {
     renderPlugin(markdownPluginView.View, {
-      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',

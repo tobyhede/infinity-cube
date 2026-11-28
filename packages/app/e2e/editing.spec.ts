@@ -56,7 +56,7 @@ import {
   viewportTransform,
   zoomCamera,
 } from './graph';
-import { seedPositionedMap } from './seed';
+import { seedPositionedMap, storeText } from './seed';
 import {
   canvasZoom,
   edgeChrome,
@@ -550,23 +550,43 @@ test('Opening an unresized Markdown Resource keeps the Closed Size and moves nob
   expect(await rect(), 'Closing changed the size').toEqual(COLLAPSED_RESOURCE_SIZE);
 });
 
+const SHORT_NOTE = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000095'), title: 'Note' };
+
+async function seedEditorMap(page: Page, title: string, size: { width: number; height: number }) {
+  const url = await storeText(page, 'Short note');
+  return seedPositionedMap(
+    page,
+    title,
+    () => ({
+      [SHORT_NOTE.id]: { x: 0, y: 300, size, content: { open: true } },
+      [NEIGHBOUR.id]: { x: 900, y: 0 },
+    }),
+    [
+      {
+        id: SHORT_NOTE.id,
+        document: { title: SHORT_NOTE.title, kind: 'markdown', content: { url } },
+      },
+    ],
+  );
+}
+
 test('An edit draws a Markdown Resource at its Edit size, which a resize writes and the next edit keeps', async ({
   page,
 }) => {
-  const SIZE = { width: 300, height: 200 };
-  const seeded = await seedPositionedMap(page, 'Edit Size Geometry', () => ({
-    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
-    [NEIGHBOUR.id]: { x: 900, y: 0 },
-  }));
+  const SIZE = { width: 700, height: 350 };
+  const seeded = await seedEditorMap(page, 'Edit Size Geometry', SIZE);
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Edit Size Geometry');
   await settled(page);
-  const resource = seededNode(page, SUBJECT);
+  const resource = seededNode(page, SHORT_NOTE);
   const rect = async () =>
-    resource.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
-    }));
+    resource.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      return {
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      };
+    });
   const stored = async () => {
     const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
     expect(response.ok()).toBe(true);
@@ -579,34 +599,49 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
         }),
       })
       .parse(await response.json());
-    return loaded.snapshot.document.maps[0]?.positions[SUBJECT.id];
+    return loaded.snapshot.document.maps[0]?.positions[SHORT_NOTE.id];
   };
 
   const edit = async () => {
-    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
-    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource Note' }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of Note' })).toBeVisible();
   };
   const cancel = async () => {
     await (
       await controls(resource)
     )
-      .getByRole('button', { name: 'Cancel editing Resource A' })
+      .getByRole('button', { name: 'Cancel editing Resource Note' })
       .click();
-    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Markdown source of Note' })).toHaveCount(0);
   };
   await expect.poll(rect).toEqual(SIZE);
   const persistence = page.getByTestId('persistence-status');
   const revision = await persistence.getAttribute('data-revision');
 
-  // With no Edit size stored, the editor is drawn at the larger of the
-  // plugin's measured hint and the size on each axis (ADR 0178), its width
-  // the reading width, and beginning the edit makes no revision.
   await edit();
-  await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
-  expect((await rect()).height).toBeGreaterThanOrEqual(SIZE.height);
+  await expect.poll(async () => (await rect()).width).toBeLessThan(SIZE.width);
   await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
   expect(await stored()).not.toHaveProperty('editSize');
   const measured = await rect();
+  const textbox = page.getByRole('textbox', { name: 'Markdown source of Note' });
+  const save = async () => {
+    await textbox.press(`${PRIMARY_MODIFIER}+Enter`);
+    await expect(textbox).toHaveCount(0);
+    await expect(persistence).toHaveText('Persisted');
+  };
+
+  // Typing keeps the current size. Starting the next edit measures the saved source.
+  await textbox.fill('A longer line of Markdown source for the editor to lay out.\n'.repeat(4));
+  expect(await rect()).toEqual(measured);
+  await save();
+  await edit();
+  await expect.poll(async () => (await rect()).width).toBeGreaterThan(measured.width);
+  await expect.poll(async () => (await rect()).height).toBeGreaterThan(measured.height);
+  await textbox.fill('Short note');
+  await save();
+  await zoomCamera(page, 'Zoom out');
+  await edit();
+  await expect.poll(rect).toEqual(measured);
 
   // A resize while editing writes the Edit size, and leaves the size alone.
   await selectResource(resource);
@@ -627,7 +662,7 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
   const edited = await rect();
   expect(edited.width).toBeGreaterThan(measured.width);
   expect(edited.height).toBeGreaterThan(measured.height);
-  await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Markdown source of Note' })).toBeVisible();
   expect(await stored()).toMatchObject({ size: SIZE, editSize: edited });
 
   // Cancel draws it at its size again; the next edit draws it at the Edit size.
@@ -651,15 +686,12 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
 test('an Edit size written on one Map is not drawn on another Map that places the same Resource', async ({
   page,
 }) => {
-  const SIZE = { width: 300, height: 200 };
+  const SIZE = { width: 700, height: 350 };
   const OTHER_MAP = {
     id: uuidSchema.parse('00000000-0000-4000-8000-000000000097'),
     title: 'Edit Size Elsewhere',
   };
-  const seeded = await seedPositionedMap(page, 'Edit Size Here', () => ({
-    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
-    [NEIGHBOUR.id]: { x: 900, y: 0 },
-  }));
+  const seeded = await seedEditorMap(page, 'Edit Size Here', SIZE);
   // A second Map placing the same Resource at the same size, with no Edit size.
   const committed = await page.request.post('/api/spaces', {
     data: {
@@ -678,7 +710,7 @@ test('an Edit size written on one Map is not drawn on another Map that places th
                   title: OTHER_MAP.title,
                   kind: 'positioned',
                   positions: {
-                    [SUBJECT.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
+                    [SHORT_NOTE.id]: { x: 0, y: 300, size: SIZE, content: { open: true } },
                   },
                   graphs: [
                     {
@@ -700,29 +732,31 @@ test('an Edit size written on one Map is not drawn on another Map that places th
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Edit Size Here');
   await settled(page);
-  const resource = seededNode(page, SUBJECT);
+  const resource = seededNode(page, SHORT_NOTE);
   const rect = async () =>
-    resource.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
-    }));
+    resource.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      return {
+        width: Number.parseFloat(getComputedStyle(element).width),
+        height: Number.parseFloat(getComputedStyle(element).height),
+      };
+    });
   const edit = async () => {
-    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
-    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource Note' }).click();
+    await expect(page.getByRole('textbox', { name: 'Markdown source of Note' })).toBeVisible();
   };
   const cancel = async () => {
     await (
       await controls(resource)
     )
-      .getByRole('button', { name: 'Cancel editing Resource A' })
+      .getByRole('button', { name: 'Cancel editing Resource Note' })
       .click();
-    await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Markdown source of Note' })).toHaveCount(0);
   };
 
-  // A resize while editing on this Map writes this Map's Edit size. With none
-  // stored, the editor is drawn at the reading width its hint asks for.
+  // Each Map starts with the plugin’s suggestion until its editor is resized.
   await edit();
-  await expect.poll(async () => (await rect()).width).toBe(READING_WIDTH);
+  await expect.poll(async () => (await rect()).width).toBeLessThan(SIZE.width);
   const measured = await rect();
   await selectResource(resource);
   const handle = await boxOf(
@@ -744,7 +778,7 @@ test('an Edit size written on one Map is not drawn on another Map that places th
   await cancel();
 
   // On the other Map the same Resource has no Edit size, so its editor is
-  // drawn as it was before any was written: at the reading width.
+  // drawn as it was before any was written: at the plugin's suggestion.
   await selectCanvas(page, OTHER_MAP.title);
   await settled(page);
   await expect.poll(rect).toEqual(SIZE);
@@ -969,8 +1003,6 @@ const RESIZED_GROWTH = {
  * `snapshot.resources` happens to arrive in; the titles are the fixture's own, and
  * are what a Resource's own controls are named for.
  */
-/** The Markdown plugin's reading width, which its measured hint is never narrower than. */
-const READING_WIDTH = 640;
 const SUBJECT = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000002'), title: 'A' };
 const NEIGHBOUR = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'), title: 'B' };
 const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), title: 'C' };
@@ -1392,11 +1424,7 @@ test(
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     await expectResourceFillsNode(persisted);
-    // With no Edit size stored, the editor is drawn at least at the authored
-    // size on each axis, from the same top-left (ADR 0178).
-    const editing = await size();
-    expect(editing.width).toBeGreaterThanOrEqual(resized.width);
-    expect(editing.height).toBeGreaterThanOrEqual(resized.height);
+    // The editor keeps the Resource's top-left.
     expect(await positionOf(persisted)).toEqual(beforePosition);
   },
 );

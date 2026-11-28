@@ -1,4 +1,4 @@
-import type { InPlaceEdit } from '@project/resource-api/view';
+import type { EditorSizing } from '@project/resource-api/view';
 import {
   beginExclusive,
   claim as claimIn,
@@ -48,14 +48,14 @@ export interface PluginGate {
   readonly claim: <Own>(
     embedding: Embedding,
     own: (live: () => boolean) => Own,
-    inPlace?: InPlaceEdit,
+    editor?: EditorSizing,
   ) => HostClaim<Own> | undefined;
   /**
-   * The drawings whose Claim was taken to edit in place, each until its Claim
+   * The drawings whose Claim was taken to edit, each until its Claim
    * is released or unmounted, however long that release waits. The same
    * value while they are unchanged.
    */
-  readonly editors: () => ReadonlyMap<DrawingKey, InPlaceEdit>;
+  readonly editors: () => ReadonlyMap<DrawingKey, EditorSizing>;
   /** The drawing is gone: its Claim and every Claim inside it are released. */
   readonly unmount: (drawing: DrawingKey) => void;
   /**
@@ -76,10 +76,10 @@ export interface PluginGate {
  */
 export function editorsOn(
   chain: ClaimChain,
-  editors: ReadonlyMap<DrawingKey, InPlaceEdit>,
+  editors: ReadonlyMap<DrawingKey, EditorSizing>,
   embeddedIn: Embedding,
-): ReadonlyMap<string, InPlaceEdit> {
-  const drawn = new Map<string, InPlaceEdit>();
+): ReadonlyMap<string, EditorSizing> {
+  const drawn = new Map<string, EditorSizing>();
   for (const embedding of chain.holders) {
     const drawing = embedding.at(-1);
     const edit = drawing === undefined ? undefined : editors.get(drawing.key);
@@ -103,7 +103,7 @@ export function createPluginGate(): PluginGate {
   let admitting = 0;
   const lentCounts = new Map<DrawingKey, number>();
   let lentDrawings: ReadonlySet<DrawingKey> = new Set();
-  let editing: ReadonlyMap<DrawingKey, InPlaceEdit> = new Map();
+  let editing: ReadonlyMap<DrawingKey, EditorSizing> = new Map();
   const listeners = new Set<() => void>();
   const changeLent = (drawing: DrawingKey, by: 1 | -1): void => {
     const count = (lentCounts.get(drawing) ?? 0) + by;
@@ -127,15 +127,15 @@ export function createPluginGate(): PluginGate {
   const claim = <Own>(
     embedding: Embedding,
     own: (live: () => boolean) => Own,
-    inPlace?: InPlaceEdit,
+    editor?: EditorSizing,
   ): HostClaim<Own> | undefined => {
     const drawing = embedding.at(-1)?.key;
     const next = claimIn(chain, embedding);
     if (drawing === undefined || next === undefined) return undefined;
     // Asked again by the drawing that holds, the chain answers the Claim it
     // holds: the opt-in it was taken with stands.
-    if (inPlace !== undefined && !holds(chain, drawing))
-      editing = new Map([...editing, [drawing, inPlace]]);
+    if (editor !== undefined && !holds(chain, drawing))
+      editing = new Map([...editing, [drawing, editor]]);
     install(next);
     return {
       release: () => install(releaseIn(chain, drawing)),

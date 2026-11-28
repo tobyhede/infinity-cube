@@ -1,21 +1,21 @@
-import { COLLAPSED_RESOURCE_SIZE, type ResourceSize } from '@project/core';
+import type { ResourceSize } from '@project/core';
 
 /** The screen pixels kept clear on each side of the visible canvas. */
 const VIEW_MARGIN = 48;
 
-/**
- * The most an in-place editor is drawn at: the visible canvas at the current
- * zoom, less a margin on each side (ADR 0178). Each axis is kept at least the
- * Closed Size, a floor ADR 0178 does not state; `visible-canvas-cap.test.ts`
- * holds it.
- */
+/** Leave at least one screen pixel for the editor on a small canvas. */
+function margin(axis: number): number {
+  return Math.min(VIEW_MARGIN, Math.max(0, (axis - 1) / 2));
+}
+
+/** The available width and height in Map units. */
 export function visibleCanvasCap(
   viewport: { readonly width: number; readonly height: number },
   zoom: number,
 ): ResourceSize {
   return {
-    width: Math.max(COLLAPSED_RESOURCE_SIZE.width, (viewport.width - 2 * VIEW_MARGIN) / zoom),
-    height: Math.max(COLLAPSED_RESOURCE_SIZE.height, (viewport.height - 2 * VIEW_MARGIN) / zoom),
+    width: (viewport.width - 2 * margin(viewport.width)) / zoom,
+    height: (viewport.height - 2 * margin(viewport.height)) / zoom,
   };
 }
 
@@ -39,8 +39,10 @@ export function leastPanToShow(
 ) {
   const left = rect.x * viewport.zoom + viewport.x;
   const top = rect.y * viewport.zoom + viewport.y;
+  const horizontal = margin(area.width);
+  const vertical = margin(area.height);
   return {
-    x: shift(left, left + rect.width * viewport.zoom, VIEW_MARGIN, area.width - VIEW_MARGIN),
-    y: shift(top, top + rect.height * viewport.zoom, VIEW_MARGIN, area.height - VIEW_MARGIN),
+    x: shift(left, left + rect.width * viewport.zoom, horizontal, area.width - horizontal),
+    y: shift(top, top + rect.height * viewport.zoom, vertical, area.height - vertical),
   };
 }

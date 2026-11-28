@@ -29,6 +29,7 @@ import { useSpaceResourceTargets } from '../space-resource-targets';
 import { removeFromMapReportedBy } from '../canvas-commands';
 import type { EmbeddedPublication } from '../map-embedding/embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
+import { useEmbeddedEditorCamera } from '../embedded-editor-camera';
 import { spaceResourceEmbedCamera } from '../camera';
 import { CanvasContinuation } from './CanvasContinuation';
 import { useNameOnCreation } from '../name-on-creation';
@@ -187,6 +188,23 @@ export function EmbeddedMapAuthoring({
     }),
     [entry.app, embeddedInDrawings],
   );
+  const [origin] = useState(() => {
+    const positions = [...authored.values()];
+    return {
+      x: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.x)),
+      y: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.y)),
+    };
+  });
+  const authoredCamera = useMemo(
+    () => spaceResourceEmbedCamera({ left, top, right, bottom }, origin, framing),
+    [origin, left, top, right, bottom, framing],
+  );
+  const { camera, cap } = useEmbeddedEditorCamera(
+    { left, top, right, bottom },
+    { x: absoluteX, y: absoluteY },
+    authoredCamera,
+    canvasRendering,
+  );
   const authoring = useCanvasResourceAuthoring({
     plugins,
     continuation: composition.continuation,
@@ -198,23 +216,13 @@ export function EmbeddedMapAuthoring({
     authoring: composition.authoring,
     spaceSession: entry.session,
     resourceResize: state.resourceResize,
+    editorCap: cap,
     onSelectResource: state.selectResource,
     onBodyEditingChange: setEditingResourceBody,
     onTitleEditingChange: setEditingResourceTitle,
     spaceResourceTargets: targets,
     resourceEntityActions,
   });
-  const [origin] = useState(() => {
-    const positions = [...authored.values()];
-    return {
-      x: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.x)),
-      y: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.y)),
-    };
-  });
-  const camera = useMemo(
-    () => spaceResourceEmbedCamera({ left, top, right, bottom }, origin, framing),
-    [origin, left, top, right, bottom, framing],
-  );
   const drawingProjection = useMemo(
     () => ({
       nodes: authoring.nodes.map((node) => ({

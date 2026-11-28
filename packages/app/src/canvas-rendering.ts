@@ -33,7 +33,7 @@ export interface CanvasRendering {
    * canvas in one render.
    */
   readonly editingEmbeddedMap: boolean;
-  /** The Resources edited in place on this canvas's Map (ADR 0178). */
+  /** The Resources edited on this canvas's Map (ADR 0178). */
   readonly editors: RenderAdapterState['editors'];
   /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
   readonly editorCap: RenderAdapterState['editorCap'];
@@ -54,7 +54,7 @@ export interface CanvasRendering {
  * The drawn Map through the placement strategy and into the render adapter.
  *
  * A resize draft's placement stands in for the Map's own while it runs, and a
- * Resource edited in place is drawn at its Edit size. Nothing
+ * Resource edited is drawn at its Edit size. Nothing
  * is worth projecting before a strategy resolves — every Resource would sit at
  * the origin — and `project` will not take a null `LayoutStrategyGraph`, so the
  * `projected` gate is the whole of that rule. The complete projection reaches
@@ -79,7 +79,7 @@ export function useCanvasRendering(
   const reportEmbeddedMapEditing = useRenderAdapter((s) => s.reportEmbeddedMapEditing);
   const selectedResourceId = selectedResourceOf(selection);
 
-  // A Resource edited in place is drawn at its Edit size (ADR 0178).
+  // A Resource edited is drawn at its Edit size (ADR 0178).
   const drawnPlacement = useMemo(
     () => editorPlacement(mapPlacement, editors, editorCap),
     [mapPlacement, editors, editorCap],

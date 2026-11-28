@@ -53,13 +53,13 @@ export interface Commits<C, M> {
   /** How many times the picker was opened. */
   readonly picked: number;
   /**
-   * How many Claims were taken and released, and the `inPlace` opt-in each
+   * How many Claims were taken and released, and the editor sizing options each
    * taken Claim carried, in order, `undefined` where it carried none.
    */
   readonly claims: {
     taken: number;
     released: number;
-    readonly inPlace: (NonNullable<ClaimOptions['inPlace']> | undefined)[];
+    readonly editors: (NonNullable<ClaimOptions['editor']> | undefined)[];
   };
 }
 
@@ -226,6 +226,7 @@ function TestRenderedMarkdown({ markdown, className, edit }: RenderedMarkdownPro
 
 /** A source editor drawn as a text area. */
 function TestSourceEditor({
+  onSuggestedSize,
   value,
   onValueChange,
   ariaLabel,
@@ -238,6 +239,8 @@ function TestSourceEditor({
       aria-label={ariaLabel}
       value={value}
       ref={(element) => {
+        if (element !== null)
+          onSuggestedSize?.({ width: element.offsetWidth, height: element.offsetHeight });
         if (autoFocus === true) element?.focus();
       }}
       onChange={(event) => onValueChange(event.target.value)}
@@ -350,7 +353,7 @@ export function renderPlugin<C, M>(
     get picked() {
       return pickerOpenings;
     },
-    claims: { taken: 0, released: 0, inPlace: [] },
+    claims: { taken: 0, released: 0, editors: [] },
   };
   const grants = options.grants ?? {};
   const answer: Answer = options.answer ?? 'completed';
@@ -471,7 +474,7 @@ export function renderPlugin<C, M>(
                 if (options.claimRefused === true) return undefined;
                 hold.take();
                 commits.claims.taken += 1;
-                commits.claims.inPlace.push(claimOptions?.inPlace);
+                commits.claims.editors.push(claimOptions?.editor);
                 return {
                   ...claim,
                   release: () => {
