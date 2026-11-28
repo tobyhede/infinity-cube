@@ -453,8 +453,8 @@ impl<S> SqlSpaceRepository<S> {
     }
 
     /// Have the next commit writing `snapshot`'s Space first replace that
-    /// Space's Resource rows with `snapshot`'s, in its own transaction, after
-    /// its read and before it takes the Space's row lock: the rows a
+    /// Space's Resource rows with `snapshot`'s, in that commit's transaction,
+    /// after its read and before it takes the Space's row lock: the rows a
     /// replacement recreating the Space at the revision the commit expects
     /// would leave (`recreatingBeforeRowLock`). These writes are not
     /// recorded as the repository's own.
@@ -546,7 +546,10 @@ impl<S: SqlStore> Shared<S> {
     }
 
     /// Insert `resource`'s row, recording the write. Every repository insert
-    /// of a Resource row goes through here.
+    /// of a Resource row goes through here:
+    /// `test/unit/repository-contract-rust-ports.test.ts`
+    /// ("asks the store to write a Resource row only where the write is
+    /// recorded") holds that.
     async fn insert_resource(
         &self,
         connection: &mut Connection<S>,
@@ -558,7 +561,10 @@ impl<S: SqlStore> Shared<S> {
 
     /// Insert or update `resource`'s row, recording the write, and answer
     /// the Space the row then belongs to. Every repository upsert of a
-    /// Resource row goes through here.
+    /// Resource row goes through here:
+    /// `test/unit/repository-contract-rust-ports.test.ts`
+    /// ("asks the store to write a Resource row only where the write is
+    /// recorded") holds that.
     async fn upsert_resource(
         &self,
         connection: &mut Connection<S>,

@@ -12,8 +12,8 @@ import { casesOf, filesUnder, markedIn, readRepositoryFile } from '../support/ca
  *
  * A contract case's name is its `it`'s first argument with the leading
  * `${name} ` (the harness's store name) dropped and any other substitution
- * written `*`. A contract case written once and run for several values names
- * each value: its Rust ports carry `// Case: <name> (<value>)`, one per value.
+ * written `*`. A case written once and run for several values names each
+ * value: its Rust ports carry `// Case: <name> (<value>)`, one per value.
  */
 
 const CONTRACT = 'test/support/repository-contract.ts';
@@ -64,7 +64,21 @@ const VALUES = {
   ],
 } satisfies Readonly<Record<string, readonly string[]>>;
 
-const VALUES_BY_CASE = new Map(Object.entries(VALUES));
+/** Each case outside the contract written once and run for several values, with its values. */
+const OUTSIDE_VALUES = {
+  'refuses a %s-path commit whose row moved before the lock, writing no Resource': [
+    'fast',
+    'complete-aggregate',
+  ],
+} satisfies Readonly<Record<string, readonly string[]>>;
+
+const VALUES_BY_CASE = new Map(Object.entries({ ...VALUES, ...OUTSIDE_VALUES }));
+
+/** A case as it runs: each value of a looped case named apart. */
+const runsOf = (name: string): string[] =>
+  (VALUES_BY_CASE.get(name) ?? [undefined]).map((value) =>
+    value === undefined ? name : `${name} (${value})`,
+  );
 
 /** Why a case does not apply to the Rust SQLite repository. */
 interface Exemption {
@@ -72,9 +86,6 @@ interface Exemption {
 }
 
 const doesNotApply = (reason: string): Exemption => ({ reason });
-
-const ROW_LOCK =
-  'the TypeScript repository reads a Space and then takes its row lock, so another writer can change the rows between the two; the Rust repository reads and writes inside one `BEGIN IMMEDIATE` transaction holding the write lock from its start, so no row changes between its read and its write';
 
 const EXEMPT = {
   // The contract.
@@ -87,8 +98,6 @@ const EXEMPT = {
   'names a statement PostgreSQL aborted for contention unavailable': doesNotApply(
     'a PostgreSQL error code: the Rust host has no PostgreSQL store yet (rust-host 16), and SQLite raises no such code',
   ),
-  'refuses a %s-path commit whose row moved before the lock, writing no Resource':
-    doesNotApply(ROW_LOCK),
 
   // test/support/fast-path-races.ts
   'commits a Map-internal Edit under the shared aggregate lock only': doesNotApply(
@@ -121,13 +130,12 @@ const contractName = (written: string): string =>
 const CONTRACT_CASES = casesOf(CONTRACT).map(contractName);
 
 /** The contract's cases as they run: each value of a looped case named apart. */
-const CONTRACT_RUNS = CONTRACT_CASES.flatMap((name) =>
-  (VALUES_BY_CASE.get(name) ?? [undefined]).map((value) =>
-    value === undefined ? name : `${name} (${value})`,
-  ),
-);
+const CONTRACT_RUNS = CONTRACT_CASES.flatMap(runsOf);
 
-const OUTSIDE_CASES = Object.fromEntries(OUTSIDE.map((file) => [file, casesOf(file)]));
+/** The cases outside the contract, by file, as they run. */
+const OUTSIDE_CASES = Object.fromEntries(
+  OUTSIDE.map((file) => [file, casesOf(file).flatMap(runsOf)]),
+);
 
 const CASES = [...CONTRACT_RUNS, ...Object.values(OUTSIDE_CASES).flat()];
 
@@ -140,14 +148,45 @@ const CONTRACT_TABLE = 'crates/host/tests/repository_contract/mod.rs';
 const SQLITE_HARNESS = 'crates/host/tests/sqlite_contract.rs';
 
 /**
- * Whether `source`, a store's `Harness`, runs the table in the form that
- * fails a case its harness cannot provide a member for, rather than reporting
- * a skip. Only then does every `// Case:` line port a case that runs on that
+ * Whether `source`, a store's `Harness`, runs the table once, in the form
+ * that fails a case its harness cannot provide a member for, rather than
+ * reporting a skip. Only then does every `// Case:` line port a case that runs on that
  * store: a member SQLite cannot provide fails the case at run time, whichever
  * way the member answers so, until the cases needing it are exemptions.
  */
 const runsEveryMember = (source: string): boolean =>
-  /^repository_cases!\([^,()]+,\s*every_member\s*\);$/mu.test(source);
+  /^repository_cases!\([^,()]+,\s*every_member\s*\);$/mu.test(source) &&
+  source.split('repository_cases!').length === 2;
+
+/** The SQL repository, whose Resource writes a test records. */
+const SQL_REPOSITORY = 'crates/host/src/sql.rs';
+
+/**
+ * The functions of the SQL repository that may ask the store of statements to
+ * write a Resource row, each with the statement it may ask for: the two that
+ * record the write, and the recreation hook, whose writes are a test's own.
+ */
+const RESOURCE_WRITERS: Readonly<Record<string, readonly string[]>> = {
+  insert_resource: ['insert_resource'],
+  upsert_resource: ['upsert_resource'],
+  recreate_before_row_lock: ['insert_resource'],
+};
+
+/**
+ * Each line of `source`, the file `file`, asking the store to write a
+ * Resource row from a function `RESOURCE_WRITERS` does not allow it in: a
+ * write `take_resource_writes` would not answer.
+ */
+const unrecordedResourceWrites = (file: string, source: string): string[] => {
+  let within = '<no function>';
+  return source.split('\n').flatMap((line, index) => {
+    within = /^\s*(?:pub(?:\([^)]*\))? )?(?:async )?fn (\w+)/u.exec(line)?.[1] ?? within;
+    const statement = /\bS::(insert_resource|upsert_resource)\(/u.exec(line)?.[1];
+    return statement === undefined || RESOURCE_WRITERS[within]?.includes(statement) === true
+      ? []
+      : [`${file}:${String(index + 1)} in \`${within}\`: ${line.trim()}`];
+  });
+};
 
 /** The contract's Rust case files, each a group of the table, by group. */
 const CONTRACT_GROUPS = filesUnder('crates/host/tests/repository_contract', (name) =>
@@ -232,6 +271,11 @@ describe('the repository cases the Rust SQLite repository is held to', () => {
     expect(Object.keys(VALUES).filter((name) => !CONTRACT_CASES.includes(name))).toEqual([]);
   });
 
+  it('names each value of a case outside the contract that runs for several', () => {
+    const written = OUTSIDE.flatMap(casesOf);
+    expect(Object.keys(OUTSIDE_VALUES).filter((name) => !written.includes(name))).toEqual([]);
+  });
+
   it('are each led by the store name in the contract', () => {
     expect(CONTRACT_CASES.filter((name) => name.startsWith('<'))).toEqual([]);
   });
@@ -290,6 +334,13 @@ describe('the Rust SQLite repository', () => {
     expect(runsEveryMember(harness)).toBe(true);
   });
 
+  it('asks the store to write a Resource row only where the write is recorded', () => {
+    const source = readRepositoryFile(SQL_REPOSITORY);
+    expect(source).toContain('S::insert_resource(');
+    expect(source).toContain('S::upsert_resource(');
+    expect(unrecordedResourceWrites(SQL_REPOSITORY, source)).toEqual([]);
+  });
+
   it('gives each exemption a reason it does not apply', () => {
     const malformed = Object.entries(EXEMPT).filter(
       ([, exemption]) => exemption.reason.trim().length === 0,
@@ -343,6 +394,30 @@ describe('the port check', () => {
     expect(runsEveryMember('repository_cases!(super::Sqlite, every_member);')).toBe(true);
     expect(runsEveryMember('repository_cases!(super::Sqlite);')).toBe(false);
     expect(runsEveryMember('// repository_cases!(super::Sqlite, every_member);')).toBe(false);
+    expect(
+      runsEveryMember(
+        'repository_cases!(super::Sqlite, every_member);\nrepository_cases!(super::Sqlite);',
+      ),
+    ).toBe(false);
+  });
+
+  it('finds a Resource write the repository does not record, naming its line', () => {
+    const source = [
+      'async fn insert_resource(',
+      '    S::insert_resource(connection, resource).await',
+      'async fn upsert_resource(',
+      '    S::upsert_resource(connection, resource).await',
+      '    async fn recreate_before_row_lock(',
+      '        S::insert_resource(connection, resource).await?;',
+      '        S::upsert_resource(connection, resource).await?;',
+      'pub(crate) async fn write_created(',
+      '    self.insert_resource(connection, resource).await?;',
+      '    S::insert_resource(connection, resource).await?;',
+    ].join('\n');
+    expect(unrecordedResourceWrites('sql.rs', source)).toEqual([
+      'sql.rs:7 in `recreate_before_row_lock`: S::upsert_resource(connection, resource).await?;',
+      'sql.rs:10 in `write_created`: S::insert_resource(connection, resource).await?;',
+    ]);
   });
 
   it('finds a marked case the table does not run, and a mark above no case', () => {
