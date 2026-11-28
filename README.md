@@ -12,20 +12,15 @@ Each preview build on the [releases page](https://github.com/tobyhede/infinity-c
 
 ### The desktop application on macOS
 
-1. **Install it.** Download `InfinityCube-<version>-aarch64-apple-darwin.dmg` from the newest release, open it and drag InfinityCube to Applications. It is not signed with an Apple Developer ID, so macOS refuses it the first time: open **System Settings › Privacy & Security**, choose **Open Anyway** beside the message about InfinityCube, and confirm, or run `xattr -dr com.apple.quarantine /Applications/InfinityCube.app` once. After that it opens as any application does. It is meant to offer each newer preview build when one is published, which has not been seen working yet.
+Run this once on a Mac with Apple silicon.
 
-2. **Make a Space.** InfinityCube opens to its **Start window**. Choose **New Space**, accept the name and location or change them, and choose **Create Space**: it writes the Space to `~/Documents/Untitled Space` by default, or to the first free name after it, such as `Untitled Space 2`, if that folder is taken, and opens it in a window named after the folder. **Open Folder…** in the Start window, or **File › Open…** (Command-O), opens a Space's folder you already have; a folder that holds no Space yet is offered **Create Space**. **File › New Space…** (Command-N) makes another.
+```sh
+curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+```
 
-3. **Put it in git before you edit**, so git can restore the Space as it was first written. Use the folder the window is named after; the commands below are for the default, `~/Documents/Untitled Space`:
-
-   ```sh
-   git init ~/Documents/"Untitled Space"
-   echo .infinity-cube.lock >> ~/Documents/"Untitled Space"/.gitignore
-   git -C ~/Documents/"Untitled Space" add -A
-   git -C ~/Documents/"Untitled Space" commit -m "New Space"
-   ```
-
-Then [use the Space](#use-a-space).
+1. Open `~/Applications` in Finder and double-click **InfinityCube**.
+2. In the **Start window**, choose **New Space**. Check the name and folder, then choose **Create Space**. To open a Space you already have, choose **Open Folder…**.
+3. Follow the [git instructions for your Space](#use-a-space) before you edit.
 
 ### The `infinity-cube` command on macOS or Linux
 
@@ -34,7 +29,7 @@ The command runs a Space in your browser, with no clone, Node or pnpm. It has no
 1. **Install it.**
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/tobyhede/infinity-cube/main/release/install.sh | sh -s -- --cli
    ```
 
    It checks the download against the release's `SHA256SUMS` and puts `infinity-cube` in `~/.local/bin`, printing the line to add if that folder is not on your `PATH`. Done when `infinity-cube --version` names the build.
@@ -55,7 +50,16 @@ Then [use the Space](#use-a-space). [`release/README.md`](release/README.md) cov
 
 ## Use a Space
 
-However you opened it, a Space works the same way. In the commands below, `<dir>` is the Space's folder; keep the quotes, since a desktop Space's folder name such as `Untitled Space` holds a space.
+In the commands below, replace `<dir>` with the Space's folder. Keep the quotes around paths with spaces.
+
+To track a new Space in git, run these commands before editing.
+
+```sh
+git init "<dir>"
+echo .infinity-cube.lock >> "<dir>/.gitignore"
+git -C "<dir>" add -A
+git -C "<dir>" commit -m "New Space"
+```
 
 1. **Edit.** Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the Active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go. Done when the save indicator reads `Persisted`.
 
@@ -206,7 +210,7 @@ A chat application with no shell reaches neither command. For one that accepts a
 
 ## Developing InfinityCube
 
-Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary. The `shadcn-first-ui` and `shadcn` skills are for developing InfinityCube's own UI. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
+Read [`AGENTS.md`](AGENTS.md) before changing code. It routes coding agents to the relevant requirements and engineering guides and defines what "done" means here. The `shadcn-first-ui` and `shadcn` skills are for developing InfinityCube's own UI. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
 
 ### Development servers
 
@@ -226,7 +230,7 @@ pnpm e2e            # Playwright flows, each test on its own isolated server
 pnpm e2e:fixture    # only the scenarios backed by the tracked fixture
 ```
 
-The Playwright commands need the Chromium browser once: `pnpm exec playwright install chromium`. CI runs more suites than these; [`AGENTS.md`](AGENTS.md#commands) lists them.
+The Playwright commands need the Chromium browser once: `pnpm exec playwright install chromium`. See [the CI workflow](.github/workflows/ci.yml) for the full set of checks.
 
 ### Local PostgreSQL
 
@@ -287,7 +291,7 @@ SQLITE_PATH=/absolute/path/infinity-cube.db pnpm cube import ./my-aggregate --st
 
 ### Architecture
 
-A pnpm workspace of `@project/*` packages and a Cargo workspace of Rust crates, with strict TypeScript and enforced package boundaries. Three rules hold throughout: domain logic stays out of React, React Flow stays in its adapter, and app wiring stays in `@project/app`. [`AGENTS.md`'s package layout](AGENTS.md#package-layout--boundaries) says what each package and crate owns and how the boundaries are enforced.
+A pnpm workspace of `@project/*` packages and a Cargo workspace of Rust crates, with strict TypeScript and enforced package boundaries. Three rules hold throughout: domain logic stays out of React, React Flow stays in its adapter, and app wiring stays in `@project/app`. [Package boundaries](docs/agents/architecture.md) describes ownership and import enforcement.
 
 ## Current limitations
 

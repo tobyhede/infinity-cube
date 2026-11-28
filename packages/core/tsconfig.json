@@ -7,7 +7,7 @@
      * alone imports a plugin (ADR 0142), and nothing else of ours. The relative-escape half of
      * the boundary is ESLint's, as it is for every package with a dependency
      * (`rootDir` would reject these legitimate imports, which resolve outside
-     * the package). See AGENTS.md, "Package layout & boundaries".
+     * the package). See docs/agents/architecture.md, "Import enforcement".
      */
     "paths": {
       "@project/plugins/domain": ["../plugins/src/domain.ts"],
