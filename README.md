@@ -206,7 +206,7 @@ A chat application with no shell reaches neither command. For one that accepts a
 
 ## Developing InfinityCube
 
-Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary. The `shadcn-first-ui` and `shadcn` skills are for developing InfinityCube's own UI. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
+Read [`AGENTS.md`](AGENTS.md) before changing code. It routes coding agents to the relevant requirements and engineering guides and defines what "done" means here. The `shadcn-first-ui` and `shadcn` skills are for developing InfinityCube's own UI. The requirements in [`docs/requirements/`](docs/requirements/) say what each area does and name the tests that hold it.
 
 ### Development servers
 
@@ -226,7 +226,7 @@ pnpm e2e            # Playwright flows, each test on its own isolated server
 pnpm e2e:fixture    # only the scenarios backed by the tracked fixture
 ```
 
-The Playwright commands need the Chromium browser once: `pnpm exec playwright install chromium`. CI runs more suites than these; [`AGENTS.md`](AGENTS.md#commands) lists them.
+The Playwright commands need the Chromium browser once: `pnpm exec playwright install chromium`. See [the CI workflow](.github/workflows/ci.yml) for the full set of checks.
 
 ### Local PostgreSQL
 
@@ -287,7 +287,7 @@ SQLITE_PATH=/absolute/path/infinity-cube.db pnpm cube import ./my-aggregate --st
 
 ### Architecture
 
-A pnpm workspace of `@project/*` packages and a Cargo workspace of Rust crates, with strict TypeScript and enforced package boundaries. Three rules hold throughout: domain logic stays out of React, React Flow stays in its adapter, and app wiring stays in `@project/app`. [`AGENTS.md`'s package layout](AGENTS.md#package-layout--boundaries) says what each package and crate owns and how the boundaries are enforced.
+A pnpm workspace of `@project/*` packages and a Cargo workspace of Rust crates, with strict TypeScript and enforced package boundaries. Three rules hold throughout: domain logic stays out of React, React Flow stays in its adapter, and app wiring stays in `@project/app`. [Package boundaries](docs/agents/architecture.md) describes ownership and import enforcement.
 
 ## Current limitations
 

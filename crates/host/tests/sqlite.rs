@@ -1206,13 +1206,14 @@ mod given_a_file_that_is_not_the_database {
 }
 
 /// ST-6: each update adds one to the revision, so a Space stored at the
-/// ceiling can be deleted but not updated.
+/// ceiling cannot be updated.
 mod given_a_space_at_the_revision_ceiling {
     use super::*;
 
     const CEILING: &str = "9223372036854775807";
 
-    // Case: refuses to store a revision above the 2^63-1 ceiling
+    // The contract case is the table's (`repository_contract::broken`);
+    // this holds a second edit at the ceiling to the same answer.
     #[tokio::test]
     async fn fails_each_update_as_broken_and_keeps_what_it_held() {
         let file = Migrated::new().await;

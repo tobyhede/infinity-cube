@@ -1,6 +1,6 @@
 # Anti-slop
 
-The 15 vendored rules are design constraints, not a formatting pass. Preserve type evidence from construction to use, parse external representations once at their I/O boundary, and give owned values named owner contracts. A green `pnpm lint:anti-slop` is the completion criterion; silencing a diagnostic without preserving that intent is not.
+The 15 vendored rules are design constraints, not a formatting pass. Preserve type evidence from construction to use, parse external representations once at their I/O boundary, and give owned values named owner contracts. Use the diagnostic procedure below. Assertion changes also need both [assertion gates](#two-rules-on-assertions).
 
 ## Responding to a diagnostic
 
@@ -15,7 +15,6 @@ Do not reshape honest code merely to evade a syntactic rule: renaming an error t
 
 - `no-known-value-widening` and `no-widen-then-assert`: keep a known value precise through use. Remove redundant broad annotations; use inference, `satisfies`, or a named owner contract.
 - `no-chained-type-assertions`: a double assertion discards the missing proof. Preserve the source type or parse the value; `as const` chains are allowed.
-- `require-safety-comment-for-type-assertion`: every non-const assertion needs an immediately preceding `SAFETY:` comment stating the checked invariant TypeScript cannot express. A comment that restates the target type is incomplete. Delete an avoidable assertion instead of documenting it. **This rule is unchanged by ADR 0062 and still applies to every surviving assertion** — see "Two rules on assertions" below, because it is no longer the whole of the policy.
 - `no-object-parameters`, `no-unknown-parameters`, `no-unknown-returns`, and `no-unknown-type-aliases`: functions exchange parsed, named contracts. Keep `unknown` visible only inside an honest parsing, caught-error, or external-contract boundary; do not conceal it behind an alias.
 - `no-unsafe-dictionary-type`: dictionaries carry a concrete owner/schema-derived value type. Parse an external payload before insertion.
 - `no-runtime-typeof`: decode representations at I/O boundaries, then branch on domain values. Type predicates may use `typeof`; `.oxlintrc.json` records the boundary, platform-detection, closed-union, and value-under-test exceptions.
@@ -24,10 +23,10 @@ Do not reshape honest code merely to evade a syntactic rule: renaming an error t
 
 Since ADR 0062 a narrowing assertion faces two gates doing different jobs, and satisfying one says nothing about the other.
 
-- `anti-slop/require-safety-comment-for-type-assertion` (oxlint) **demands a reason**. Unchanged, and it applies to every assertion still in the tree, including the ones the baseline below records.
+- `anti-slop/require-safety-comment-for-type-assertion` (oxlint) **demands a reason**. Put a `SAFETY:` comment immediately before a non-const assertion or its containing statement. State the evidence that makes the assertion safe, including at sites covered by the baseline.
 - `@typescript-eslint/no-unsafe-type-assertion` (ESLint, type-aware) **caps the count**. A narrowing assertion is an error anywhere in the repository.
 
-Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFETY:` comment is satisfied by prose, prose is the cheapest artifact an agent produces, and a comment does not survive the refactoring that moves the code it justifies — so the comment rule was never going to be the gate on new code. Equally, a count with no stated reason tells a reviewer nothing. Each rule is the other's blind spot.
+For assertion changes, run both `pnpm lint:anti-slop` and `pnpm lint`. Oxlint requires a nearby justification and rejects wording that admits the assertion is unverified. ESLint enforces the count. Reviewers check that the stated invariant holds at the assertion.
 
 ### The suppressions baseline
 
@@ -44,11 +43,7 @@ The one gap left, recorded so nobody assumes otherwise: the baseline counts per 
 
 ### Proving the gates still bite
 
-`tools/typing-fixtures/` holds one small file per construct, in a `must-fail/` half that must be rejected and a `must-pass/` half that must survive, and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks.
-
-One limit on that half is worth knowing before relying on it. `must-pass/unknown-at-parse-boundary.ts` takes the same three boundary exemptions `packages/persistence/src/http-protocol.ts` takes (`no-unknown-parameters`, `no-runtime-typeof`, `no-unsafe-dictionary-type`), because a fixture claiming a genuine parse boundary survives has to be declared the way this repository declares one. It therefore **cannot** detect those three over-reaching. The exemption is scoped to that one file, so every other `must-pass` fixture still faces every rule.
-
-The fixtures are excluded from lint, format and the root program on purpose. ESLint and oxlint exclusion are pinned by tests; the root program is pinned only by the shape of `tsconfig.json`'s `include`, and Prettier exclusion is not pinned at all — a leak there would show up as a confusing `verify` failure rather than a silent pass.
+When changing a rule or a fixture, follow the [typing fixture guide](../../tools/typing-fixtures/README.md) and run `test/unit/typing-fixtures.test.ts`. Every `must-fail` fixture must be rejected and every `must-pass` fixture must survive within its declared exemptions. Check the scoped overrides in `.oxlintrc.json` before relying on a passing fixture.
 
 ## Ownership
 
@@ -66,7 +61,7 @@ The fixtures are excluded from lint, format and the root program on purpose. ESL
 
 A module that mints identities, reads time or otherwise depends on a nondeterministic in-process function receives that function when it is composed, so a test can supply a deterministic one. Its operational interface then stays in domain language and does not repeat the dependency on every call.
 
-- **`newId` is required, with no default.** `createSpaceAuthoring` takes it exactly as it takes `reportObserverError`, and mints the Resource, Map and Graph ids of a completed Edit from it. `packages/app/src/compose-app.ts` supplies it explicitly, so every authored identity has one visible source. `createOpenSpaces` takes the same `newId`, also required with no default, and supplies it to every `composeApp` call it makes, alongside its `reportObserverError`: omitting either lets `composeApp`'s own defaults reinstate the ambient generator and `console.error` behind the one owner's back.
+- **`newId` is required, with no default.** `createSpaceAuthoring` takes it exactly as it takes `reportObserverError`, and mints the Resource, Map and Graph ids of a completed Edit from it. `packages/app/src/compose-app.ts` supplies it explicitly, so every authored identity has one visible source. `createOpenSpaces` takes the same `newId`, also required with no default, and accepts an optional `reportObserverError`. It resolves the reporter at that boundary and forwards both dependencies to every `composeApp` call.
 - **Do not answer a test's need for a known id with `vi.spyOn(crypto, 'randomUUID')`.** ADR 0109 rejects it on the grounds ADR 0016 gave for `loadSpace`: a constant collides across a property test's cases, so it needs a counter, at which point a generator exists anyway; `randomUUID` is an unseedable CSPRNG, so controlling it means owning it; and the mock stops working in silence the day the implementation moves to UUID v7 and reads the clock as well as the entropy pool. A spy also hides a miscount: a spy naming two ids for an Edit that mints three lets the third come from the real generator unnoticed. Tests name the ids they assert on through `packages/app/test/minting.ts`.
 - **Do not manufacture a port or adapter for a dependency with one in-process implementation**, and do not hide nondeterminism behind global mocking. Deterministic rules stay uninjected: `titles.ts` mints `Resource N`, `Map N` and `Graph N` through three named operations with the `<Prefix> N` arithmetic private, because nothing there is worth replacing in a test.
 

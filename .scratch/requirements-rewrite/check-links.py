@@ -15,13 +15,17 @@ hyphens, duplicates suffixed -1, -2 ...).
 Run from the repository root:  python3 .scratch/requirements-rewrite/check-links.py
 Exits non-zero and lists each broken link.
 """
+import argparse
 import os
 import re
 import subprocess
 import sys
 
-root = sys.argv[1] if len(sys.argv) > 1 else "."
-os.chdir(root)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("root", nargs="?", default=".")
+parser.add_argument("--agent-docs", action="store_true", help="Check only AGENTS.md and docs/agents/")
+args = parser.parse_args()
+os.chdir(args.root)
 
 listed = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "*.md"]).decode().split("\n")
 adr_body = re.compile(r"^docs/adr/(superseded/)?\d{4}-")
@@ -34,6 +38,9 @@ files = sorted(
     and not adr_body.match(f)
 )
 
+if args.agent_docs:
+    files = [f for f in files if f == "AGENTS.md" or f.startswith("docs/agents/")]
+
 anchor_cache = {}
 
 
@@ -45,29 +52,75 @@ def slug(heading):
     return heading.replace(" ", "-")
 
 
+def prose(path):
+    """Keep block boundaries while removing fenced examples of either spelling."""
+    lines = []
+    fence = None
+    with open(path, encoding="utf8") as source:
+        for line in source:
+            marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+            if fence is not None:
+                if marker and marker[1].startswith(fence) and not marker[2].strip():
+                    fence = None
+                lines.append("\n")
+            elif marker and (marker[1][0] == "~" or "`" not in marker[2]):
+                fence = marker[1]
+                lines.append("\n")
+            else:
+                lines.append(line)
+    return "".join(lines)
+
+
 def anchors(path):
     if path not in anchor_cache:
-        text = re.sub(r"```.*?```", "", open(path, encoding="utf8").read(), flags=re.S)
-        seen = {}
+        text = prose(path)
+        headings = re.compile(
+            r"^ {0,3}#{1,6}[ \t]+(?P<atx>[^\n]+?)[ \t]*#*[ \t]*$"
+            r"|^ {0,3}(?P<setext>[^\s][^\n]*)\n {0,3}(?:=+|-+)[ \t]*$",
+            re.M,
+        )
         out = set()
-        for m in re.finditer(r"^#{1,6}\s+(.*?)\s*#*\s*$", text, re.M):
-            s = slug(m.group(1))
-            n = seen.get(s, 0)
-            out.add(s if n == 0 else f"{s}-{n}")
-            seen[s] = n + 1
+        for match in headings.finditer(text):
+            base = slug(match["atx"] or match["setext"])
+            name = base
+            suffix = 0
+            while name in out:
+                suffix += 1
+                name = f"{base}-{suffix}"
+            out.add(name)
         out.update(re.findall(r'<a\s+(?:name|id)="([^"]+)"', text))
         anchor_cache[path] = out
     return anchor_cache[path]
 
 
+def destinations(text):
+    text = re.sub(r"`[^`\n]*`", "", text)
+    destination = r"<([^<>\n]*)>|([^\s)<>]+)"
+    references = {}
+
+    def label(value):
+        return " ".join(value.split()).casefold()
+
+    def remember(match):
+        references.setdefault(label(match[1]), match[2] if match[2] is not None else match[3])
+        return ""
+
+    text = re.sub(r"^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:" + destination + r").*$",
+                  remember, text, flags=re.M)
+    inline = re.compile(r'\]\(\s*(?:' + destination + r')(?:\s+"[^"]*")?\s*\)')
+    for match in inline.finditer(text):
+        yield match[1] if match[1] is not None else match[2]
+
+    for match in re.finditer(r"\[([^\]\n]*)\](?:\[([^\]\n]*)\])?(?!\()", text):
+        target = references.get(label(match[2] or match[1]))
+        if target is not None:
+            yield target
+
+
 broken = []
 checked = 0
 for f in files:
-    text = open(f, encoding="utf8").read()
-    text = re.sub(r"```.*?```", "", text, flags=re.S)
-    text = re.sub(r"`[^`\n]*`", "", text)
-    for m in re.finditer(r"\]\(<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\)", text):
-        url = m.group(1)
+    for url in destinations(prose(f)):
         if re.match(r"^[a-z][a-z0-9+.-]*:", url):
             continue
         checked += 1
