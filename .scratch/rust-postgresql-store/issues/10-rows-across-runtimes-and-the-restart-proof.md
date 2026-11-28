@@ -30,8 +30,8 @@ Two things to record here, which the run could not write into tickets:
 
 What remains is the maintainer's: mark the PR ready and merge it. Do not rebuild this ticket.
 
-**2026-11-28, review and fixes.** PR #556 is at head `f653c5e0`, with `main` merged in, and `CI passed` is green. The review confirmed the first three boxes from the code and CI, and they are now checked.
+**2026-11-28, review and fixes.** PR #556 is at head `6b0480f1`, with `main` merged in, and `CI passed` is green. The review confirmed the first three boxes from the code and CI, and they are now checked.
 - **Fixed.** The Rust read of TypeScript's rows was compared only with the Rust memory store. `crates/host/tests/rows_support/mod.rs` now asserts literal values: each Space's revision and exported revision, the listed Spaces, the unlisted kind's content, the chart's placement field by field (an absent Edit size among them), and the Edges' Titles. These fail under a mutation that drops a placement's size.
-- **Fixed.** `AGENTS.md` says the role `DATABASE_URL` names must be allowed to create databases.
-- **Decided, being made on the PR.** `@types/pg` is pinned at 8.21.0, the newest published release not above `pg` 8.22.0, which follows `@prisma-next/driver-postgres`. This settles the choice the entry above leaves to the maintainer; the branch still pins 8.23.1 until the change is pushed.
-- **Decided, being made on the PR.** The TypeScript half of the rows test gets the same literal assertions.
+- **Fixed.** `README.md` says the role `DATABASE_URL` names must be allowed to create databases, beside the PostgreSQL integration steps. `main` has since moved the command reference out of `AGENTS.md`.
+- **Decided and made.** `@types/pg` is pinned at 8.21.0, the newest published release not above `pg` 8.22.0, which follows `@prisma-next/driver-postgres`. This settles the choice the entry above leaves to the maintainer.
+- **Decided and made.** The TypeScript half of the rows test gets the same literal assertions.
