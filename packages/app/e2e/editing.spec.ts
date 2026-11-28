@@ -614,20 +614,7 @@ test('An edit draws a Markdown Resource at its Edit size, which a resize writes 
   await settled(page);
   const resource = seededNode(page, SHORT_NOTE);
   const rect = () => editorRect(resource);
-  const stored = async () => {
-    const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
-    expect(response.ok()).toBe(true);
-    const loaded = z
-      .object({
-        snapshot: z.object({
-          document: z.object({
-            maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
-          }),
-        }),
-      })
-      .parse(await response.json());
-    return loaded.snapshot.document.maps[0]?.positions[SHORT_NOTE.id];
-  };
+  const stored = async () => (await storedPositions(page, seeded.snapshot.id))?.[SHORT_NOTE.id];
 
   const edit = async () => {
     await (await controls(resource)).getByRole('button', { name: 'Edit Resource Note' }).click();
@@ -868,21 +855,104 @@ test('An Edit size larger than the canvas draws capped and in view, and stays st
 
   // Neither the cap nor the pan is an Edit: the Edit size stays as stored.
   await expect(persistence).toHaveAttribute('data-revision', revision);
-  const response = await page.request.get(`/api/spaces/${seeded.snapshot.id}`);
-  expect(response.ok()).toBe(true);
-  const loaded = z
-    .object({
-      snapshot: z.object({
-        document: z.object({
-          maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
-        }),
-      }),
-    })
-    .parse(await response.json());
-  expect(loaded.snapshot.document.maps[0]?.positions[SUBJECT.id]).toMatchObject({
+  expect((await storedPositions(page, seeded.snapshot.id))?.[SUBJECT.id]).toMatchObject({
     size: SIZE,
     editSize: EDIT_SIZE,
   });
+});
+
+/**
+ * While a Resource is edited, the Resources its drawn rect passes are
+ * drawn aside by the rule a Resize applies, with their Edges, and further as
+ * the editor grows; none of it is stored, and once the edit ends every
+ * Resource is drawn where the Map stores it (ADR 0178).
+ */
+test('An editor draws its neighbours aside without storing it, and they return when it ends', async ({
+  page,
+}) => {
+  const SIZE = { width: 300, height: 200 };
+  const EDIT_SIZE = { width: 640, height: 360 };
+  const seeded = await seedPositionedMap(
+    page,
+    'Displaced Edit Geometry',
+    () => ({
+      [SUBJECT.id]: { x: 0, y: 300, size: SIZE, editSize: EDIT_SIZE, content: { open: true } },
+      [NEIGHBOUR.id]: { x: 400, y: 300 },
+    }),
+    [],
+    [{ from: SUBJECT.id, to: NEIGHBOUR.id }],
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Displaced Edit Geometry');
+  await settled(page);
+  const resource = seededNode(page, SUBJECT);
+  const neighbour = seededNode(page, NEIGHBOUR);
+  const edge = edgeNamed(page, 'Edge from A to B in Graph 1');
+  const persistence = page.getByTestId('persistence-status');
+  const revision = (await persistence.getAttribute('data-revision')) ?? '';
+  const stored = { x: 400, y: 300 };
+  const edgeEnd = async () => (await pointOnEdge(edge, 1)).x;
+  await expect.poll(() => positionOf(neighbour)).toEqual(stored);
+  const restingEdgeEnd = await edgeEnd();
+  const textbox = page.getByRole('textbox', { name: 'Markdown source of A' });
+  const edit = async () => {
+    await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
+    await expect(textbox).toBeVisible();
+  };
+
+  // Editing draws the neighbour aside by the Edit size's growth, and its Edge
+  // follows.
+  await edit();
+  await expect.poll(() => positionOf(neighbour)).toEqual({ x: 740, y: 300 });
+  await settled(page);
+  expect(await edgeEnd()).toBeGreaterThan(restingEdgeEnd);
+  await (
+    await controls(resource)
+  )
+    .getByRole('button', { name: 'Cancel editing Resource A' })
+    .click();
+  await expect(textbox).toHaveCount(0);
+  await expect.poll(() => positionOf(neighbour)).toEqual(stored);
+  await expect(persistence).toHaveAttribute('data-revision', revision);
+
+  // Growing the editor draws it further aside; the resize writes the Edit
+  // size alone, never the neighbour's position.
+  await edit();
+  await expect.poll(() => positionOf(neighbour)).toEqual({ x: 740, y: 300 });
+  await selectResource(resource);
+  // The editor grows to its Edit size by animation, so the handle is measured
+  // once it has settled.
+  await resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const handle = await boxOf(
+    resource.locator('.react-flow__resize-control.handle.bottom.right'),
+    'resize control',
+  );
+  // The status reads Persisted at the revision seeded before the resize, and
+  // the resize adds exactly one revision.
+  await expect(persistence).toHaveText('Persisted');
+  await expect(persistence).toHaveAttribute('data-revision', revision);
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 100, handle.y + handle.height / 2 + 40, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(persistence).toHaveAttribute('data-revision', String(Number(revision) + 1));
+  await expect(persistence).toHaveText('Persisted');
+  await expect.poll(async () => (await positionOf(neighbour)).x).toBeGreaterThan(740);
+  await expect(textbox).toBeVisible();
+
+  // Saving ends the edit, and the neighbour is drawn where the Map stores it.
+  await textbox.fill('# Saved');
+  await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
+  await expect(textbox).toHaveCount(0);
+  await expect(persistence).toHaveText('Persisted');
+  await expect.poll(() => positionOf(neighbour)).toEqual(stored);
+  await settled(page);
+  expect(await edgeEnd()).toBeCloseTo(restingEdgeEnd, 0);
+  expect((await storedPositions(page, seeded.snapshot.id))?.[NEIGHBOUR.id]).toMatchObject(stored);
 });
 
 /**
@@ -1042,6 +1112,25 @@ async function seedGeometry(
 /** The node React Flow drew for one seeded Resource. */
 const seededNode = (page: Page, resource: { readonly id: string }): Locator =>
   page.locator(`.react-flow__node[data-id="${resource.id}"]`);
+
+/** The positions a seeded Space's first Map stores, read back from the server. */
+async function storedPositions(
+  page: Page,
+  spaceId: string,
+): Promise<Record<string, z.infer<typeof resourcePlacementSchema>> | undefined> {
+  const response = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(response.ok()).toBe(true);
+  const loaded = z
+    .object({
+      snapshot: z.object({
+        document: z.object({
+          maps: z.array(z.object({ positions: z.record(resourcePlacementSchema) })),
+        }),
+      }),
+    })
+    .parse(await response.json());
+  return loaded.snapshot.document.maps[0]?.positions;
+}
 
 /**
  * One seeded Resource's position out of a frame `allPositions` read.

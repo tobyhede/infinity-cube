@@ -778,6 +778,66 @@ describe('render adapter', () => {
       ).toEqual({ width: 640, height: 360 });
     });
 
+    it('draws the Resources it passes aside, by the Resize rule, and stores none of it', () => {
+      const withNeighbours = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const drawn = editorPlacement(withNeighbours, new Map([[RESOURCE_A, {}]]));
+      // The same displacement a Resize from the size to the Edit size makes.
+      const resized = Placement.displace(
+        withNeighbours,
+        RESOURCE_A,
+        { width: 300, height: 200 },
+        { width: 640, height: 360 },
+      );
+      expect(drawn.get(RESOURCE_C)).toEqual(resized.get(RESOURCE_C));
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
+      // A capped editor passes only as far as it is drawn.
+      expect(
+        editorPlacement(withNeighbours, new Map([[RESOURCE_A, {}]]), {
+          width: 500,
+          height: 300,
+        }).get(RESOURCE_C),
+      ).toMatchObject({ x: 600, y: 20 });
+      // The Map's own placement is untouched, and with no editor it is drawn.
+      expect(withNeighbours.get(RESOURCE_C)).toMatchObject({ x: 400, y: 20 });
+      expect(editorPlacement(withNeighbours, new Map())).toBe(withNeighbours);
+    });
+
+    it('applies the signed Resize displacement on each axis', () => {
+      const placement = Placement.fromEntries([
+        [
+          RESOURCE_A,
+          {
+            x: 0,
+            y: 0,
+            size: { width: 640, height: 200 },
+            editSize: { width: 300, height: 360 },
+          },
+        ],
+        [RESOURCE_B, { x: 700, y: 0 }],
+        [RESOURCE_C, { x: 0, y: 400 }],
+      ]);
+      const drawn = editorPlacement(placement, new Map([[RESOURCE_A, {}]]));
+      expect(drawn.get(RESOURCE_A)?.size).toEqual({ width: 300, height: 360 });
+      expect(drawn.get(RESOURCE_B)).toMatchObject({ x: 360, y: 0 });
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 0, y: 560 });
+    });
+
+    it('stores a dragged neighbour it draws aside at its Map position moved by the drag', () => {
+      const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const spy = authoringSpy({ mapPlacement: withNeighbour });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      const drawn = editorPlacement(withNeighbour, store.getState().editors);
+      expect(drawn.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
+      store.getState().syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_C, 740, 20)], []);
+
+      completeDrag(store, RESOURCE_C, 745, 20);
+
+      expect(spy.completions).toEqual([
+        { kind: 'settled-resource-movement', moved: new Map([[RESOURCE_C, { x: 405, y: 20 }]]) },
+      ]);
+    });
+
     it('is drawn capped at the visible canvas, which stores nothing', () => {
       const drawn = editorPlacement(authored, new Map([[RESOURCE_A, {}]]), {
         width: 500,
@@ -862,6 +922,42 @@ describe('render adapter', () => {
       expect(spy.completions).toEqual([
         { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 320, height: 220 } },
       ]);
+    });
+
+    it('redraws a resize under way of another Resource when an editor ends', () => {
+      const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const spy = authoringSpy({ mapPlacement: withNeighbour });
+      const store = createRenderAdapter(spy.authoring);
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+      store.getState().resourceResize.beginResize(RESOURCE_C);
+      store.getState().resourceResize.previewResize(RESOURCE_C, { width: 120, height: 80 });
+      expect(store.getState().resizeDraft?.placement.get(RESOURCE_C)).toMatchObject({ x: 740 });
+
+      store.getState().resourceResize.drawEditors(new Map());
+
+      const placement = store.getState().resizeDraft?.placement;
+      expect(placement?.get(RESOURCE_C)).toMatchObject({
+        x: 400,
+        y: 20,
+        size: { width: 120, height: 80 },
+      });
+      expect(placement?.get(RESOURCE_A)?.size).toEqual({ width: 300, height: 200 });
+      store.getState().resourceResize.finishResize(RESOURCE_C);
+      expect(spy.completions).toEqual([
+        { kind: 'resized-resource', resourceId: RESOURCE_C, size: { width: 120, height: 80 } },
+      ]);
+    });
+
+    it('redraws a resize under way of another Resource when an editor begins', () => {
+      const withNeighbour = Placement.fromEntries([...authored, [RESOURCE_C, { x: 400, y: 20 }]]);
+      const store = createRenderAdapter(authoringSpy({ mapPlacement: withNeighbour }).authoring);
+      store.getState().resourceResize.beginResize(RESOURCE_C);
+
+      store.getState().resourceResize.drawEditors(new Map([[RESOURCE_A, {}]]));
+
+      const placement = store.getState().resizeDraft?.placement;
+      expect(placement?.get(RESOURCE_C)).toMatchObject({ x: 740, y: 20 });
+      expect(placement?.get(RESOURCE_A)?.size).toEqual({ width: 640, height: 360 });
     });
 
     it('keeps the editors it holds when told the same ones again', () => {
