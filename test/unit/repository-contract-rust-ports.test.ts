@@ -166,11 +166,11 @@ const SQL_REPOSITORY = 'crates/host/src/sql.rs';
  * write a Resource row, each with the statement it may ask for: the two that
  * record the write, and the recreation hook, whose writes are a test's own.
  */
-const RESOURCE_WRITERS: Readonly<Record<string, readonly string[]>> = {
-  insert_resource: ['insert_resource'],
-  upsert_resource: ['upsert_resource'],
-  recreate_before_row_lock: ['insert_resource'],
-};
+const RESOURCE_WRITERS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['insert_resource', ['insert_resource']],
+  ['upsert_resource', ['upsert_resource']],
+  ['recreate_before_row_lock', ['insert_resource']],
+]);
 
 /**
  * Each line of `source`, the file `file`, asking the store to write a
@@ -182,7 +182,7 @@ const unrecordedResourceWrites = (file: string, source: string): string[] => {
   return source.split('\n').flatMap((line, index) => {
     within = /^\s*(?:pub(?:\([^)]*\))? )?(?:async )?fn (\w+)/u.exec(line)?.[1] ?? within;
     const statement = /\bS::(insert_resource|upsert_resource)\(/u.exec(line)?.[1];
-    return statement === undefined || RESOURCE_WRITERS[within]?.includes(statement) === true
+    return statement === undefined || RESOURCE_WRITERS.get(within)?.includes(statement) === true
       ? []
       : [`${file}:${String(index + 1)} in \`${within}\`: ${line.trim()}`];
   });
