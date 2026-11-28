@@ -4,12 +4,10 @@ How work moves from a question to committed code in this repo.
 
 ## The loop
 
-1. **Survey** — read `CONTEXT.md`, the requirements doc for the area, any ADR that `python3 scripts/adr_snapshot.py check` lists as pending, and the code. Propose candidate changes and pick one.
-2. **Grill** — walk the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. No code until it is.
-3. **Record** — put settled names in `CONTEXT.md`. A decision that locks a trade-off becomes an ADR; it edits no requirements doc (see _ADRs and the requirements snapshot_). This fires mid-conversation, the moment something settles.
-4. **Implement** — code and tests together. A behaviour change updates its requirements doc in the same commit.
-5. **Verify** — meet the bar in `AGENTS.md` and the checks below.
-6. **Capture** — resolve the ticket with an `## Answer`, update the requirement's status and evidence, and fix docs that described the old state.
+- **Survey.** Follow the [root reading order](../../AGENTS.md#read-before-changing-an-area). Identify the requirement and the code or evidence the task affects.
+- **Design decision.** If the task leaves a design decision open, propose a candidate and walk its decision tree one question at a time, with a recommendation for each. Confirm the decision before implementing it. Record settled terms in `CONTEXT.md` and apply [the ADR criteria](#when-to-write-an-adr).
+- **Implement and verify.** Apply the agreed change. For a behaviour change, follow [the implementation rule](#implement-a-behaviour-change). Follow the [verification bar](#verification-bar).
+- **Tracked work.** Resolve its ticket with an `## Answer` and update any requirement status the evidence changes.
 
 Park work outside the current task in the [issue tracker](issue-tracker.md), under `.scratch/<feature>/`.
 
@@ -21,19 +19,7 @@ ADRs 0145 and 0175 decide this section.
 
 [`docs/requirements/snapshot.lock.json`](../requirements/snapshot.lock.json) records, by the hash of each ADR's text, which ADRs the requirements restate. `scripts/adr_snapshot.py` writes it and checks it; nobody edits it by hand. The script is a copy of `plugins/skillz/skills/adr-snapshot/scripts/adr_snapshot.py` in [tobyhede/skillz](https://github.com/tobyhede/skillz), whose tests cover it; its `SCRIPT_VERSION` names the release copied, and it is replaced only by a newer release, never edited here. An ADR the lock does not record, or whose text changed since, is **pending**: an accepted one binds where it differs from the docs until the next refresh, and a proposed one binds nothing. `python3 scripts/adr_snapshot.py check` lists the pending ADRs, and CI runs it on every pull request, failing only on a mechanical fault (a malformed lock, a locked ADR gone without a recorded supersession, a doc citing an ADR without linking the lock, a broken ADR link, an uncited locked ADR with no recorded reason). Each requirements doc opens with a line linking the lock.
 
-**Reading order.** `AGENTS.md`'s task table, then `CONTEXT.md` for terms, then the owning requirements doc, then any ADR that `python3 scripts/adr_snapshot.py check` lists as pending. Open an older ADR for the full argument, a rejected alternative or the history, or before changing what it decides. [`domain.md`](domain.md) carries the same order for the engineering skills.
-
-These are the topics that have requirements. This is the one list; a topic not on it is read through its ADRs and the engineering guides in `docs/agents/`. Each doc links the lock near its top.
-
-| Topic | Requirements doc |
-| --- | --- |
-| Space and Resources | [`docs/requirements/space-and-resources.md`](../requirements/space-and-resources.md) |
-| Maps and Graphs | [`docs/requirements/maps-and-graphs.md`](../requirements/maps-and-graphs.md) |
-| Editing | [`docs/requirements/editing.md`](../requirements/editing.md) |
-| Storage and hosts | [`docs/requirements/storage.md`](../requirements/storage.md) |
-| Rendering | [`docs/requirements/rendering.md`](../requirements/rendering.md) |
-| UI | [`docs/requirements/ui.md`](../requirements/ui.md) |
-| Navigation | [`docs/requirements/navigation.md`](../requirements/navigation.md) |
+Use the [root task table](../../AGENTS.md#read-before-changing-an-area) or the [requirements index](../requirements/README.md) to find the owner.
 
 | Document | Owns |
 | --- | --- |
@@ -46,13 +32,30 @@ These are the topics that have requirements. This is the one list; a topic not o
 | `docs/adr/archive/agent-guides/` | The product guides the requirements replaced, kept as history |
 | `.scratch/` delivery issues | Implementation work, investigations and completed-work narratives |
 
-**A new ADR edits no requirements doc.** Accepting an ADR leaves the requirements alone; `check` reports it as pending. **A refresh** reconciles the docs against the pending ADRs: restate what each decides as rules with their reasons and evidence, link the ADR file from each rule it sources (a relative Markdown link is what `check` counts as coverage; a plain `ADR NNNN` is prose), then run `python3 scripts/adr_snapshot.py stamp`, adding `--na PATH REASON` for an ADR no requirement needs to cite and `--leave-pending PATH` for each pending ADR the refresh did not reconcile; its `recorded:` lines name every ADR the lock now claims. Moving an ADR into `docs/adr/superseded/` records it in the same change with `python3 scripts/adr_snapshot.py supersede OLD NEW`, since `check` fails on a locked ADR that has gone; it touches nothing else in the lock, and a requirement still citing the old ADR shows as pending until the refresh cites the new one. Add each reconciled ADR's rows to the topic's `trace/` file, including a row for an ADR read and found to own no rule there; `python3 .scratch/requirements-rewrite/check-dispositions.py` fails only for an ADR named in no trace row, conflict file or `DECISIONS.md` line (it does not check each topic), `check-evidence.py` and `check-links.py` beside it check each cited test title and link, and `check-glossary.py` fails for a term a requirements doc defines, or lists on its Terms line, that has no `CONTEXT.md` entry. A requirements doc defines no term of its own: a term it needs goes into `CONTEXT.md` in the same change, and its Terms line names it. A wording fix or a faithful restatement in a requirements doc needs no ADR and no `stamp`; `stamp` runs only when the docs have been reconciled against the pending ADRs.
+**ADR acceptance.** A new or revised decision goes into an ADR. Acceptance leaves the requirements snapshot as it was, and `check` lists the decision as pending.
 
-**A ruling is recorded where it belongs.** A resolution that changes what an accepted ADR decides, or one the ADR process requires to be recorded, is a new ADR, and the requirement changes with it. A resolution that only settles which accepted source holds, or records detail no ADR states, goes into the owning requirement with its date and into the topic's trace. A behaviour change still updates its requirement in the same commit; only restating a new ADR waits for the next refresh.
+### Implement a behaviour change
+
+Update the owning requirement, its reason and its evidence in the same commit as the behaviour change. A ruling that settles which source holds, or records detail no ADR decides, belongs in the owning requirement and its dated trace.
+
+### Refresh the snapshot
+
+1. Run `python3 scripts/adr_snapshot.py check` and decide which pending ADRs the refresh covers.
+2. Reconcile each selected ADR with the owning requirements. Record reasons and evidence, link each rule to the ADR by relative Markdown link, and record its disposition in the topic's trace, including ADRs that own no rule there. Add newly defined terms to `CONTEXT.md` and reference them on the requirements doc's Terms line.
+3. Run `python3 scripts/adr_snapshot.py stamp`. Pass `--na PATH REASON` for ADRs that no requirement needs to cite and `--leave-pending PATH` for each unreconciled ADR. Compare the `recorded:` lines with the decisions reviewed.
+4. Run `check` again and run the disposition, evidence, link and glossary checks in `.scratch/requirements-rewrite/`. Confirm that remaining pending ADRs match the intended exclusions.
+
+A wording fix or faithful restatement that leaves ADR coverage unchanged leaves the lock alone.
+
+### Record a supersession
+
+When moving an ADR to `docs/adr/superseded/`, run `python3 scripts/adr_snapshot.py supersede OLD NEW` in the same change. Confirm that `check` recognises the move. A requirement still citing the old file stays pending until the refresh updates it.
+
+### Maintain requirements
 
 **Code is evidence of what is built.** It does not retire an accepted rule. Surface a disagreement between code, a requirement and an ADR, and resolve it explicitly before changing the rule. Preserve the distinction between `not built` and `bug: code differs`; update status only with evidence.
 
-**Maintain the owner.** Update a behaviour's requirement in the same commit as its change, including the rule's reason and evidence. Link from other topics rather than duplicating the rule. Rule ids are append-only: leave a removed rule as a tombstone and never renumber its neighbours. Check references whenever a rule is added, removed or redirected.
+**Maintain the owner.** Link from other topics rather than duplicating the rule. Rule ids are append-only: leave a removed rule as a tombstone and never renumber its neighbours. Check references whenever a rule is added, removed or redirected.
 
 **Keep treatment in code and tests.** Durations, easing, colours, sizes, spacing, typography, shadows and animation choreography alone are not requirements. Requirements retain what is drawn and what it means, what is reachable, what is focused or announced, and what is stored.
 
@@ -74,7 +77,7 @@ Format: a title that states the decision as a sentence, a status block, then a f
 
 ## ADRs are append-only
 
-An ADR becomes a historical record when it merges to `main`. Until then it is a draft on its branch, whatever its status line says: when it is wrong, fix it in place, and fix the requirement and `CONTEXT.md` with it.
+An ADR becomes a historical record when it merges to `main`. Until then it is a draft on its branch, whatever its status line says: when it is wrong, fix it in place. Update settled terms in `CONTEXT.md` and follow the [snapshot rules](#adrs-and-the-requirements-snapshot) for requirements.
 
 A merged, accepted ADR is **immutable**. It records why a decision looked right at the time, with what was known then. So never merge, rewrite or consolidate ADRs. When a decision changes, write a new one and amend the old one's status block; that block is the only edit an accepted ADR ever receives. A superseded ADR moves to `docs/adr/superseded/`. The current statement of a topic lives in its requirements doc, never in a rewritten ADR.
 
@@ -114,15 +117,19 @@ Diff a replay against the merged result; a clean dry run proves only that the ma
 
 For a format change, roll schema, fixtures, examples and tests forward together under [Storage and hosts](../requirements/storage.md#rolling-forward). Fix generated state at its source; keep bootstrap and reset practical. Do not assume an author's Aggregate directory or browser copy is reproducible from this repository.
 
+## Cross-module coordination
+
+Use a functional core and imperative shell. Compute and validate the complete next state in a private pure core before producing side effects; a thin imperative shell then updates collaborators in an order that preserves valid intermediate states. Expose the coordination as one operation rather than returning a plan for callers to execute. Keep framework and store events outside the seam, depend on existing module interfaces, and do not manufacture single-adapter ports for deterministic private helpers. An edit event is a notification, not state transfer: each editor first installs its authoritative completed state and only then emits the notification; the coordinator derives the next Space from the current state owned by its collaborators rather than from state carried by the event.
+
 ## Verification bar
 
-The bar is `AGENTS.md`'s “Before claiming done”. In addition:
+Follow [Before claiming done](../../AGENTS.md#before-claiming-done) and use the [verification commands](verification.md#verification-commands) for the surface you changed. In addition:
 
 - A behaviour-preserving refactor leaves e2e green and unchanged.
 - Reproduce a defect before fixing it, then show the regression case pass.
 - Domain tests assert refusal codes and typed context; presentation tests assert wording and accessibility. Non-Edits retain the working snapshot's identity.
 - Every new interaction tied to a Resource, Map, Graph or Edge has an acceptance case for replacement of its Space while the interaction is live. Verify that its draft and pending continuation are discarded.
-- An unavailable control uses `aria-disabled`; test that attribute and that activation does nothing, rather than using `toBeDisabled`.
+- For a control using `aria-disabled`, including an unavailable command under [UI-29](../requirements/ui.md), assert the attribute and verify activation does nothing. `toBeDisabled` checks native disabled state.
 - Base UI dispatches a `PointerEvent` for keyboard-activated menu items; jsdom needs that subclass supplied. Let a dismissed menu's focus-restoring microtask settle before the next gesture under test.
 
 ### Fixture data
@@ -138,6 +145,10 @@ Every meaningful stable-story claim links two behavioural proofs: the rendered L
 Full-application stories mount `components/Application.tsx`. `stories/support/application.ts` supplies fixture snapshots and isolated memory/history adapters; setup opens and enters through Open Spaces and creates failures through backend outcomes. Reach transient states through production operations or controls. Do not build a second Dock, session map or snapshot-edit implementation in the fixture. Account for inactive Spaces remaining mounted in browser assertions.
 
 Exercise refusals through production gestures. If a refusal cannot be reached through a browser gesture, hand the story its structured refusal and declare the claim's `applicationEvidence` exemption; do not inject display prose through a callback. `stories/support` is catalogue furniture: use `inv-*` styling and mount the production surface rather than imitating its classes.
+
+## Reviewing agent documentation
+
+Ask “What will an agent do differently after reading this, and where does that instruction belong?” For example, a Space chrome change sends the agent from the root instructions to the verification guide. The guide explains why to inspect the database restart proofs as well as the ordinary browser specs. The package scripts own the commands those proofs run.
 
 ## What a comment may assert
 
@@ -164,6 +175,8 @@ Put change history and rejected alternatives in the commit or delivery issue. Ke
 Tool directives (`eslint-disable`, `@ts-expect-error`, `prettier-ignore`) retain their syntax; their free-text reasons follow these rules. Preserve required `SAFETY:` assertion comments and comments satisfying `no-empty`. When a repository-scanning test requires specific text, change that test in the same commit if the text must change; `.scratch/code-quality/issues/01-write-the-source-comment-rule.md` lists such cases.
 
 ## Skills
+
+The authoring skill links only by absolute URL because it is installed outside the repository. `test/unit/agent-skill-commands.test.ts` checks its links.
 
 Skills are tracked, so every clone and worktree has them. `.agents/skills/` is the repo-wide location Codex reads, and `.claude/skills/` holds a symlink per skill into it, which is where Claude Code reads. The files of `infinity-cube-authoring` and `infinity-cube-getting-started` live in the `infinity-cube` plugin, under `plugins/infinity-cube/skills/`, and `.agents/skills/` holds a symlink to each, so an install of the plugin and this repository read the same files (`test/unit/agent-skill-symlinks.test.ts` holds both sets of links).
 
