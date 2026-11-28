@@ -175,43 +175,47 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.getByRole('button', { name: 'Edit Resource Notes' })).toBeEnabled();
   });
 
-  it('suggests the source editor’s dimensions once per edit without a stored Edit size', async () => {
-    const width = vi
-      .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
-      .mockReturnValue(431);
-    const height = vi
-      .spyOn(HTMLTextAreaElement.prototype, 'offsetHeight', 'get')
-      .mockReturnValue(187);
-    try {
-      const pendingDiagram = mermaidPluginViewWith(() => new Promise<string>(() => undefined));
-      const rendered = renderPlugin(pendingDiagram.View, {
-        content,
-        map: open,
-        title: 'Notes',
-        grants: editable,
-        assets: reading({ [TEXT_REF]: 'Old' }),
-      });
-      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-      const editor = await screen.findByRole('textbox');
-      expect(width.mock.contexts).toEqual([editor]);
-      expect(height.mock.contexts).toEqual([editor]);
-      fireEvent.change(editor, { target: { value: 'A different draft' } });
-      expect(screen.getByRole('textbox')).toBe(editor);
-      expect(rendered.commits.claims.editors).toEqual([
-        { suggestedSize: { width: 431, height: 187 } },
-      ]);
-      fireEvent.keyDown(editor, { key: 'Escape' });
-      width.mockReturnValue(515);
-      fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
-      expect(rendered.commits.claims.editors[1]).toEqual({
-        suggestedSize: { width: 515, height: 187 },
-      });
-      expect(rendered.commits.map).toEqual([]);
-    } finally {
-      width.mockRestore();
-      height.mockRestore();
-    }
-  });
+  it.each([open, closed])(
+    'suggests the source editor’s dimensions once per edit without a stored Edit size, map %j',
+    async (map) => {
+      const width = vi
+        .spyOn(HTMLTextAreaElement.prototype, 'offsetWidth', 'get')
+        .mockReturnValue(431);
+      const height = vi
+        .spyOn(HTMLTextAreaElement.prototype, 'offsetHeight', 'get')
+        .mockReturnValue(187);
+      try {
+        const pendingDiagram = mermaidPluginViewWith(() => new Promise<string>(() => undefined));
+        const rendered = renderPlugin(pendingDiagram.View, {
+          content,
+          map,
+          title: 'Notes',
+          grants: editable,
+          assets: reading({ [TEXT_REF]: 'Old' }),
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+        const editor = await screen.findByRole('textbox');
+        expect(width.mock.contexts).toEqual([editor]);
+        expect(height.mock.contexts).toEqual([editor]);
+        fireEvent.change(editor, { target: { value: 'A different draft' } });
+        expect(screen.getByRole('textbox')).toBe(editor);
+        expect(rendered.commits.claims.editors).toEqual([
+          { suggestedSize: { width: 431, height: 187 } },
+        ]);
+        fireEvent.keyDown(editor, { key: 'Escape' });
+        width.mockReturnValue(515);
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+        expect(rendered.commits.claims.editors[1]).toEqual({
+          suggestedSize: { width: 515, height: 187 },
+        });
+        expect(rendered.commits.map).toEqual([]);
+        if (!map.open) expect(drawn).toEqual([]);
+      } finally {
+        width.mockRestore();
+        height.mockRestore();
+      }
+    },
+  );
 
   it('says a failure Mermaid gives no words for in its own', async () => {
     const silent = mermaidPluginViewWith(() => Promise.reject(new Error(' ')));
@@ -621,7 +625,7 @@ describe('the Mermaid plugin’s view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(rendered.commits.map).toEqual([open, closed, open]);
+    expect(rendered.commits.map).toEqual([open, closed]);
   });
 
   it('keeps editing what was typed while a Save was under way', async () => {
@@ -677,24 +681,56 @@ describe('the Mermaid plugin’s view', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Draft');
   });
 
-  it('offers Edit when Closed, which Opens it and then begins editing', async () => {
+  it('begins an edit from Closed with no Open, and every exit leaves it Closed (ADR 0178)', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
       grants: editable,
       assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
-    expect(await screen.findByRole('textbox', { name: 'Mermaid source of Notes' })).toHaveValue(
-      'Old',
-    );
-    expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.claims.taken).toBe(1);
+    const view = () => document.querySelector('[data-open]');
+    const source = () => screen.queryByRole('textbox', { name: 'Mermaid source of Notes' });
+    const edit = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('textbox', { name: 'Mermaid source of Notes' })).toHaveValue(
+        'Old',
+      );
+      // Still Closed: the Open control keeps its place, unavailable.
+      expect(view()).toHaveAttribute('data-open', 'false');
+      expect(screen.getByRole('button', { name: 'Open Resource Notes' })).toBeDisabled();
+    };
+
+    await edit();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Notes' }));
+    expect(source()).toBeNull();
+    expect(view()).toHaveAttribute('data-open', 'false');
+    expect(screen.getByRole('img', { name: mermaidPlugin.name })).toBeInTheDocument();
+    // Closed again, no diagram is drawn.
+    expect(screen.queryByTestId('mermaid-diagram')).toBeNull();
+
+    await edit();
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+    expect(source()).toBeNull();
+    expect(view()).toHaveAttribute('data-open', 'false');
+
+    await edit();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'New' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(source()).toBeNull());
+    expect(view()).toHaveAttribute('data-open', 'false');
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+
+    // No exit and no beginning committed Open or Close.
+    expect(rendered.commits.map).toEqual([]);
+    expect(rendered.commits.claims.taken).toBe(3);
+    expect(rendered.commits.claims.released).toBe(3);
   });
 
-  it('Opens but begins no edit from Closed when its text cannot be read', async () => {
+  it('begins no edit from Closed, and commits nothing, when its source cannot be read', async () => {
     const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
       content,
       map: closed,
       title: 'Notes',
@@ -702,14 +738,118 @@ describe('the Mermaid plugin’s view', () => {
       assets: reading({}),
     });
     fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
-    expect(await screen.findByRole('note')).toBeInTheDocument();
-    expect(rendered.commits.map).toEqual([open]);
-    expect(rendered.commits.claims.taken).toBe(0);
-    expect(screen.queryByRole('textbox')).toBeNull();
     // The Edit pressed is answered, not dropped.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This source cannot be read, so it cannot be edited.',
     );
+    expect(rendered.commits.map).toEqual([]);
+    expect(rendered.commits.claims.taken).toBe(0);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('Saves from Closed on Mod-Enter, leaving it Closed', async () => {
+    const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    const source = await screen.findByRole('textbox', { name: 'Mermaid source of Notes' });
+    fireEvent.change(source, { target: { value: 'New' } });
+    fireEvent.keyDown(source, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(rendered.commits.map).toEqual([]);
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+    expect(rendered.commits.claims.released).toBe(1);
+  });
+
+  it('reads nothing more for an edit from Closed once its Save lands', async () => {
+    const reads: AssetRef[] = [];
+    const texts = reading({ [TEXT_REF]: 'Old' });
+    const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: closed,
+      title: 'Notes',
+      grants: editable,
+      assets: {
+        read: (ref: AssetRef) => {
+          reads.push(ref);
+          return texts.read(ref);
+        },
+        store: () => Promise.resolve(SAVED_REF),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'New' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    // Closed again, a source changed elsewhere is not read.
+    act(() => rendered.changeContent({ url: UNREAD_REF }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(reads).toEqual([TEXT_REF]);
+    // Nor is a diagram drawn for it, seen or unseen.
+    expect(drawn).toEqual([]);
+  });
+
+  it('ends an Edit from Closed whose Claim is refused as it begins, so a later Edit begins', async () => {
+    for (const sized of [{ editSize: STORED_EDIT_SIZE }, {}]) {
+      let refusing = true;
+      let asked = 0;
+      const rendered = renderPlugin(mermaidPluginView.View, {
+        ...sized,
+        content,
+        map: closed,
+        title: 'Notes',
+        grants: editable,
+        get claimRefused() {
+          asked += 1;
+          return refusing;
+        },
+        assets: reading({ [TEXT_REF]: 'graph TD' }),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+      await waitFor(() => expect(asked).toBe(1));
+      expect(screen.queryByRole('textbox')).toBeNull();
+      expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
+      expect(screen.getByRole('button', { name: 'Open Resource Notes' })).toBeEnabled();
+      refusing = false;
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Notes' }));
+      expect(await screen.findByRole('textbox', { name: 'Mermaid source of Notes' })).toHaveValue(
+        'graph TD',
+      );
+      expect(rendered.commits.claims.taken).toBe(1);
+      expect(rendered.commits.map).toEqual([]);
+      rendered.unmount();
+    }
+  });
+
+  it('keeps editing when a Close from elsewhere arrives mid-edit (ADR 0178)', async () => {
+    const rendered = renderPlugin(mermaidPluginView.View, {
+      editSize: STORED_EDIT_SIZE,
+      content,
+      map: open,
+      title: 'Notes',
+      grants: editable,
+      assets: { ...reading({ [TEXT_REF]: 'Old' }), store: () => Promise.resolve(SAVED_REF) },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource Notes' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    act(() => rendered.changeMap(closed));
+    // Editing is not stored, so a stored Close does not end it.
+    expect(screen.getByRole('textbox', { name: 'Mermaid source of Notes' })).toHaveValue('Draft');
+    expect(rendered.commits.claims.released).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Resource Notes' }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    expect(rendered.commits.content).toEqual([{ url: SAVED_REF }]);
+    expect(document.querySelector('[data-open]')).toHaveAttribute('data-open', 'false');
   });
 
   it('Saves a draft whose content changed meanwhile to text it cannot read', async () => {

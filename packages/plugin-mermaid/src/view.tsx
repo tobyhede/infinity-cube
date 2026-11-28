@@ -75,7 +75,7 @@ const UNREAD = 'Reading it failed.';
 /** What the status says where a Save failed rather than being refused. */
 const UNSAVED = 'The source could not be saved. Your draft is kept; Save again to retry.';
 
-/** What the status says where Edit was pressed while Closed and the source it Opened to cannot be read. */
+/** The refusal when Edit cannot read the source of a Closed Resource. */
 const UNEDITABLE = 'This source cannot be read, so it cannot be edited.';
 
 /** What is drawn in place of the diagram where its source is empty. */
@@ -321,7 +321,8 @@ function MermaidView({
   const url = surface.content.value.url;
   const [known] = useState(createKnownText);
   const open = surface.map.value.open;
-  const text = useText(url, surface.assets, known, open);
+  const [readingForEdit, setReadingForEdit] = useState(false);
+  const text = useText(url, surface.assets, known, open || readingForEdit);
   const mapCommit = surface.map.commit;
   const contentCommit = surface.content.commit;
   const store = surface.assets.store;
@@ -342,11 +343,8 @@ function MermaidView({
   const drawable = editing === null && open ? readable : null;
   const diagram = useDiagram(drawable, scheme, render, scratch);
   const mayAuthor = contentCommit !== undefined && store !== undefined && takeClaim !== undefined;
-  const mayEdit = open && readable !== null && mayAuthor;
-  // Edit on a Closed Resource Opens it and then begins editing (ADR 0064):
-  // what it Opens to is read only once it is Open, so the text decides then.
-  const mayEditClosed = !open && mayAuthor && mapCommit !== undefined;
-  const editWhenOpen = useRef(false);
+  const mayEdit = readable !== null && mayAuthor;
+  const mayEditClosed = !open && mayAuthor;
 
   const beginEdit = useCallback(() => {
     if (!mayEdit || editing !== null) return;
@@ -364,20 +362,12 @@ function MermaidView({
 
   const end = useCallback(() => setEditing(null), []);
 
-  // A Resource Closed elsewhere while its draft was up has nowhere to draw it.
-  if (editing !== null && !open) setEditing(null);
-
-  // An Edit asked for while Closed begins once the Open it caused has landed
-  // and the text is read, and where the text cannot be read says it cannot.
   useEffect(() => {
-    if (text.state === 'refused' && editWhenOpen.current) {
-      editWhenOpen.current = false;
-      setRefusal(UNEDITABLE);
-    }
-    if (!editWhenOpen.current || !open || text.state !== 'read') return;
-    editWhenOpen.current = false;
-    beginEdit();
-  }, [open, text.state, beginEdit]);
+    if (!readingForEdit || text.state === 'reading') return;
+    setReadingForEdit(false);
+    if (text.state === 'refused') setRefusal(UNEDITABLE);
+    else beginEdit();
+  }, [readingForEdit, text.state, beginEdit]);
 
   const save = useCallback(() => {
     if (editing?.claim === undefined || editing.saving) return;
@@ -421,19 +411,12 @@ function MermaidView({
   const commitMap = useCallback(
     (next: MermaidMapContent) => {
       if (mapCommit === undefined) return;
-      const committed = mapCommit(next);
-      // What an earlier gesture was refused is cleared by the next press, not
-      // by this answer, which may land after an Edit from Closed is answered.
-      void committed.then(
+      void mapCommit(next).then(
         (answer) => {
           const refused = refusalOf(answer);
-          if (refused === null) return;
-          setRefusal(refused);
-          editWhenOpen.current = false;
+          if (refused !== null) setRefusal(refused);
         },
-        () => {
-          editWhenOpen.current = false;
-        },
+        () => undefined,
       );
     },
     [mapCommit],
@@ -473,11 +456,10 @@ function MermaidView({
           disabled: editing.saving,
           keyshortcuts: 'Escape',
         },
-        // Closing mid-edit would take the draft's box away; the control keeps
-        // its place and says it is unavailable.
+        // Keep the current Open or Close control in its place while editing.
         ...(mapCommit === undefined
           ? []
-          : [{ ...openClose(false), run: () => undefined, disabled: true }]),
+          : [{ ...openClose(!open), run: () => undefined, disabled: true }]),
       ];
     }
     const edit: RailCommand[] =
@@ -492,8 +474,7 @@ function MermaidView({
                 ? beginEdit
                 : () => {
                     setRefusal(null);
-                    editWhenOpen.current = true;
-                    commitMap({ open: true });
+                    setReadingForEdit(true);
                   },
             },
           ]
@@ -532,6 +513,8 @@ function MermaidView({
     commitMap,
   ]);
 
+  const drawnOpen = open || editing !== null;
+
   // Like the disabled Cancel, Escape waits for a Save under way: a Save that
   // is refused leaves its draft up.
   const escape = (): void => {
@@ -543,7 +526,7 @@ function MermaidView({
       // Closed, the Title sits at the foot of the rect, as every Closed
       // Resource's does.
       style={
-        !open
+        !drawnOpen
           ? { ...fill, height: '100%', justifyContent: 'flex-end' }
           : editing !== null
             ? { ...fill, height: '100%' }
@@ -571,11 +554,14 @@ function MermaidView({
       />
       <div
         ref={titleRow}
-        style={{ padding: `${railBand}px ${INSET}px ${open ? 0 : CLOSED_FOOT}px`, minHeight: 0 }}
+        style={{
+          padding: `${railBand}px ${INSET}px ${drawnOpen ? 0 : CLOSED_FOOT}px`,
+          minHeight: 0,
+        }}
       >
         <Title />
       </div>
-      {!open && (
+      {!drawnOpen && (
         // The kind glyph sits in the band along the top, at its right, as
         // every Closed Resource's does; an Open one draws none.
         <span
@@ -586,7 +572,7 @@ function MermaidView({
           <MermaidGlyph />
         </span>
       )}
-      {open && (
+      {drawnOpen && (
         <div
           style={{
             position: 'relative',
