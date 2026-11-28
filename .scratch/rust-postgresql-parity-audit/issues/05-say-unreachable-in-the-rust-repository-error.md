@@ -16,3 +16,9 @@ ADR 0177 says "The term is Unreachable" and `CONTEXT.md:464-466` defines **Unrea
 - [ ] If the rename is not wanted, say so in ADR 0177's successor and add the variant to the vocabulary test's exemptions with the reason.
 
 **Named mutants:** none; a rename.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Untouched.
+
+`crates/host/src/repository.rs:225-226` still reads `#[error("the store is unavailable: {0}")] Unavailable(String)`.

@@ -16,3 +16,9 @@ Storage has "The SQLite host" (ST-126 to ST-128) and no PostgreSQL counterpart. 
 - [ ] ST-3's "ignored by default" sentence corrected.
 
 **Named mutants:** none; documentation.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Untouched.
+
+`docs/requirements/storage.md` has "The SQLite host" (`:78`) and no PostgreSQL host section. ST-3 still says the PostgreSQL tests are "ignored by default; they need a server" (`:70`). `python3 scripts/adr_snapshot.py check` still lists ADR 0177 as pending.

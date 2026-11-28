@@ -109,6 +109,8 @@ judged against the identity the replacement established: Ok(AggregateRefused(Com
 
 ## The ports test with every PostgreSQL file listed
 
+This run is a record of `32d316f3`, and its two failures do not hold at `5a0956f8`. There the ports test itself reads every file below but `postgres_wire.rs` and `postgres_rows.rs` (`test/unit/repository-contract-rust-ports.test.ts:732-752`), and `pnpm exec vitest run test/unit/repository-contract-rust-ports.test.ts` passes all 78 of its tests.
+
 A copy of `test/unit/repository-contract-rust-ports.test.ts` whose `POSTGRES.files` (`:820`) also lists `postgres_concurrency.rs`, `postgres_outages.rs`, `postgres_races.rs`, `postgres_url.rs`, `postgres_wire.rs`, `postgres_rows.rs`, `crates/host/src/sql/postgres/tests.rs` and `crates/cli/tests/serve_postgres.rs`, run with `pnpm exec vitest run <copy> -t "the Rust PostgreSQL repository"` and then deleted.
 
 ```text
@@ -355,6 +357,8 @@ for (const m of unknown) console.error(`  ${m.file}:${m.line} ${m.name}`);
 ```
 
 ## `render.mjs`
+
+The verdicts below are as at `32d316f3`. At `5a0956f8` the case map's rows for `database-http-runtime.test.ts:102`, `:135` and `:179`, `vite-hono-host.test.ts:974`, `prisma-foundation.test.ts:45`, `:53` and `:63`, `postgres-persistence.spec.ts:71` and the fourteen "one test per value" rows are corrected by hand, not by this script.
 
 ```js
 // Render the independent case map as Markdown from map.json and the hand verdicts below.

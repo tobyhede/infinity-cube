@@ -26,3 +26,11 @@ The ports test calls the first four pending on 09 and the fifth pending on 09, t
 - [ ] Check before marking that each Rust test asserts what the TypeScript case asserts (`:135` asserts one report of the transient failure and a 200 listing; say in the comment above the Rust test where it differs).
 
 **Named mutants:** removing any one of the five marks fails the ports test once 01 has landed.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Partly done.
+
+What holds now. Each of the five Rust tests carries its case's mark as `// TypeScript case:` in `crates/cli/tests/serve_postgres.rs`, which `test/unit/repository-contract-rust-ports.test.ts` reads as a shared file (`:744`, `:750`): `:371`, `:400` and `:661` for the three `database-http-runtime` arms, each with `(PostgreSQL)`; `:154` for "composes an application when the repository cannot be reached"; and `:155` for "trims a configured DATABASE_URL", on `announces_and_answers_503_from_a_trimmed_database_url_in_the_nearest_env` rather than on `postgres_url.rs` › `trims_the_value`, which carries no mark. No `pending` exemption is left (`:929-930`).
+
+What is left: the comment above `announces_before_the_database_answers_and_initializes_it_once_it_does` (`serve_postgres.rs:398-399`) says it uses a real outage, but not that it does not assert the one report of the transient failure that the TypeScript case at `test/integration/database-http-runtime.test.ts:135` asserts. The test asserts the 503 before and the 200 listing of one Space after (`:416-428`).

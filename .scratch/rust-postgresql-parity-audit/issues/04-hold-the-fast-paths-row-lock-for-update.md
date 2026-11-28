@@ -16,3 +16,9 @@ Fresh mutant A05 (`../mutants.md`) makes `hold_space` take `FOR SHARE` instead o
 - [ ] The test fails with `FOR SHARE` (A05) and with no row lock (A04).
 
 **Named mutants:** A05 (`FOR SHARE`), A04 (no row lock).
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Untouched.
+
+`hold_space` still takes `FOR UPDATE` (`crates/host/src/sql/postgres.rs:396-399`). `crates/host/tests/postgres_concurrency.rs` changed since `32d316f3` only in three marks; no test pauses one single-Space Edit at `Step::RowLock` while a second Edit to the same Space waits. The `Step::RowLock` pauses in `postgres_races.rs` (`:402`, `:485`, `:583`) overlap an Edit with a Graph deletion, a replacement or an Edit to another Space. The mutants were not run again.

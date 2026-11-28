@@ -25,3 +25,9 @@ A probe test showed it (`../evidence.md` › `A02 probe`): an aggregate commit p
 - [ ] Both fail with A02 applied.
 
 **Named mutants:** A02.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Untouched.
+
+`relock_meta` still compares `meta_space_id = $1` (`crates/host/src/sql/postgres.rs:369`). `crates/host/tests/postgres_concurrency.rs` changed since `32d316f3` only in three marks, so `given_overlapping_replacements` still has no test committing a replacement between the identity read and the relock. The mutants were not run again.

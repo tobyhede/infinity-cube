@@ -28,3 +28,16 @@ Adding the files (`../evidence.md` › `ports-probe.txt`) fails two of the test'
 - [ ] `prisma-foundation.test.ts`'s three blank-or-trimmed `DATABASE_URL` cases are ported (`postgres_url.rs` › `trims_the_value`) or exempt as the settled difference (Rust refuses a blank URL), not pending on 09.
 
 **Named mutants:** deleting any one ported test in the eight files, or one value's arm, fails "ports or exempts every case and value"; restoring a `pending` exemption fails the tally.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Partly done.
+
+What holds now. `test/unit/repository-contract-rust-ports.test.ts` gives the PostgreSQL adapter these files: `crates/host/tests/postgres.rs`, `postgres_concurrency.rs`, `postgres_outages.rs`, `postgres_properties.rs`, `postgres_races.rs`, `postgres_url.rs` and `crates/host/src/sql/postgres/tests.rs` as its own (`:735-743`), and `crates/cli/tests/serve_postgres.rs` as a shared file whose `// TypeScript case:` lines are its marks (`:744`, `:750`). It lists them by name, not by pattern. The tally pins 178 ported, 0 pending, 11 owned elsewhere and 4 accepted differences (`:925-935`), and the file passes (78 tests). Every per-value mark it reads names its value; a bare one fails "marks and exempts only cases and values the lists hold" (`:897-900`). The restart proof is exempt as owned elsewhere, `rust-postgresql-store 10` (`:693-695`). The three blank-or-trimmed `DATABASE_URL` cases are ported by marks at `serve_postgres.rs:112`, `:113` and `:155`. The five marks of 02 are read.
+
+What is left:
+
+- It does not read `crates/host/tests/postgres_wire.rs` (which holds HTTP conformance marks, held by `test/unit/http-conformance-rust-ports.test.ts`) or `crates/host/tests/postgres_rows.rs` (which holds no mark). A new `postgres*.rs` file is not read until it is listed.
+- `test/integration/postgres-rows-across-runtimes.test.ts` is in no source list and no exemption (`:515-536`, `:665-712`).
+- The `pending` kind is still in the type: `PlanTicket` (`:310`), the union (`:323`) and `pending()` (`:328`), with no exemption using it.
+- The contract's per-value values come from the hand-written `VALUES` (`:61-74`), which no check compares with the contract's loops, for PostgreSQL as for SQLite. `.scratch/rust-postgresql-store/issues/16-sqlite-per-value-cases-in-the-ports-test.md` (on another branch) covers that; this ticket does not repeat it.

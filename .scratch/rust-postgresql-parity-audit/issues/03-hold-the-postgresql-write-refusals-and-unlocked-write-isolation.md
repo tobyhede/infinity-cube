@@ -25,3 +25,9 @@ Each is reachable only through a writer outside the repository's decisions (dire
 - [ ] A24: a test through a trigger, or a sentence in the code saying why the branch answers what it does.
 
 **Named mutants:** A09, A19, A22, A24.
+
+## Comments
+
+**2026-11-28, re-read at `5a0956f8`.** Untouched.
+
+Since `32d316f3`, `crates/host/tests/postgres.rs` gained a `KeyOrder` and `every_member` on its table run and renamed locals; `given_a_row_changed_outside_the_decision` (`:972`) still has no case for an update meeting a Resource row another Space owns (A09, A22). No test overlaps `mark_exported` or `store_asset` with another writer (A19): neither name occurs in `postgres_concurrency.rs` or `postgres_races.rs`. Unlocked writes still begin `READ COMMITTED` (`crates/host/src/sql/postgres.rs:340`), and ADR 0177 still does not say so. A24 has neither a test nor a sentence. The mutants were not run again.

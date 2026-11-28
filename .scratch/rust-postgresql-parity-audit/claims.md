@@ -1,6 +1,6 @@
 # Claims checked against code and tests
 
-Every claim ADR 0177 makes, and every PostgreSQL claim in `docs/requirements/storage.md`, checked at `32d316f3` against the code and the tests that run on PostgreSQL. Each is **confirmed** (code and a test hold it), **code only** (the code does it and no test fails if it stops), **imprecise** (true in substance, worded wrongly) or **wrong**.
+Every claim ADR 0177 makes, and every PostgreSQL claim in `docs/requirements/storage.md`, checked at `32d316f3` against the code and the tests that run on PostgreSQL. Claims 1 and 37 are re-read at `5a0956f8` and say what holds there. Claim 36, ST-3's "ignored by default" sentence and ADR 0177's pending status still hold at `5a0956f8`. Other line numbers are those of `32d316f3`. Each is **confirmed** (code and a test hold it), **code only** (the code does it and no test fails if it stops), **imprecise** (true in substance, worded wrongly) or **wrong**.
 
 "Mutant" names a fresh hand mutant in `mutants.md`. A claim a surviving mutant breaks is "code only".
 
@@ -12,7 +12,7 @@ Storage has no PostgreSQL host section. It has "The SQLite host" (ST-126 to ST-1
 
 | # | Claim | Verdict | Evidence |
 | --- | --- | --- | --- |
-| 1 | One contract table per store, `repository_cases!(harness)` | confirmed | `crates/host/tests/postgres.rs:241` runs it; the harness answers `Ok` for every member (`:164-234`); 75 of 76 contract runs carry a mark (`case-map.md`) |
+| 1 | One contract table per store, `repository_cases!(harness)` | confirmed | At `5a0956f8`, `crates/host/tests/postgres.rs:244` runs it with `every_member`, the form the ports test requires (`test/unit/repository-contract-rust-ports.test.ts:906-911`); the harness declares its `KeyOrder` (`postgres.rs:151`) and answers `Ok` for every member (`:147-242`); 75 of 76 contract runs carry a mark, the 76th the change-order accepted difference (`:913-923`) |
 | 2 | No process serialisation on PostgreSQL | confirmed | `SERIAL = false` (`crates/host/src/sql/postgres.rs:333`), read gate shared (`crates/host/src/sql.rs:492-496`); `postgres_races.rs` › `lets_map_internal_edits_to_different_spaces_commit_side_by_side` |
 | 3 | Key `(1213812818, 1)`, transaction-scoped | confirmed | `postgres.rs:27`, `pg_advisory_xact_lock[_shared]` (`:351-352`); `postgres_concurrency.rs` › `given_the_lock_key`; mutants A07, A08 killed |
 | 4 | Exclusive for aggregate commit, `load_aggregate`, both lifecycle doors | confirmed | `sql.rs:916, 953, 969, 1001`; mutant A12 killed |
@@ -48,7 +48,7 @@ Storage has no PostgreSQL host section. It has "The SQLite host" (ST-126 to ST-1
 | 34 | A committed `-0` loads as `0` | confirmed | `postgres.rs` (tests) › `loads_a_committed_negative_zero_as_zero` (`:385`) |
 | 35 | Each operation runs to completion in a task of its own | confirmed | `sql.rs:481-509`; `sql::tests::dropped_callers` (four pause points) |
 | 36 | The term is Unreachable | **imprecise** | `CONTEXT.md:464` defines it, but the Rust type still calls it `RepositoryError::Unavailable`, and its message says "the store is unavailable" (`crates/host/src/repository.rs:224-226`), the word the glossary keeps for a command. Ticket 05 |
-| 37 | "The ports test names the decision beside the case it exempts" | **partly wrong** | the ports test names four accepted differences (`test/unit/repository-contract-rust-ports.test.ts:688-730`); it does not read eight of the PostgreSQL test files, so its other 99 exemptions are "pending" on tickets that have landed. Ticket 01 |
+| 37 | "The ports test names the decision beside the case it exempts" | confirmed, at `5a0956f8` | the ports test exempts 4 runs as accepted differences, each naming its decision, and 11 as owned elsewhere, each naming its ticket; none is pending (`test/unit/repository-contract-rust-ports.test.ts:665-712`, tally `:925-935`). `isExplained` fails an exemption without its ticket, reason or decision (`:937-942`). What is left of ticket 01 is the files it does not read |
 | 38 | The PostgreSQL tests run in the `rust` and `crap-rust` jobs and fail rather than skip without the server variable | confirmed | `.github/workflows/ci.yml:773` (`--no-tests=fail`), `:866` (`crap:rust:coverage:postgres`); `crates/host/tests/postgres_support/mod.rs` panics in `server()` |
 
 ## Storage
