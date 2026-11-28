@@ -83,7 +83,7 @@ Test paths: `contract::…` cases are the repository contract table (`crates/hos
 
 ### 03, the ports test (PR #559)
 
-Each is an edit to `test/unit/repository-contract-rust-ports.test.ts` or the case reader it imports, `test/support/case-names.ts`, and each fails tests of `test/unit/repository-contract-rust-ports.test.ts` (run with `pnpm exec vitest run test/unit/repository-contract-rust-ports.test.ts`). Each was re-run for this file on 2026-11-28 in the form given.
+Each is an edit to `test/unit/repository-contract-rust-ports.test.ts` or the case reader it imports, `test/support/case-names.ts`, and each fails tests of `test/unit/repository-contract-rust-ports.test.ts` (run with `pnpm exec vitest run test/unit/repository-contract-rust-ports.test.ts`). Each was re-run for this file on 2026-11-28 in the form given, first when the test pinned the PostgreSQL tally at 80 ported and 99 pending, and again with ticket 11's branch merged in and ticket 10's restart proof exempt as owned elsewhere, when it pinned 178 ported and none pending: the same tests killed each both times, and the counts of further failing tests below are the second run's.
 
 | Mutant | Killed by |
 | --- | --- |
