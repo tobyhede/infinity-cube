@@ -290,10 +290,10 @@ export const casesOf = (file: string): string[] => {
 /** The comment that marks a port: `// Case: <name>`, or `// TypeScript case: <name>`. */
 export type Marker = 'Case' | 'TypeScript case';
 
-const MARKERS: Readonly<Record<Marker, RegExp>> = {
+const MARKERS = {
   Case: /^\s*\/\/ Case: (.+)$/gmu,
   'TypeScript case': /^\s*\/\/ TypeScript case: (.+)$/gmu,
-};
+} satisfies Readonly<Record<Marker, RegExp>>;
 
 /** The case names `files` mark with `marker`, in the order written. */
 export const markedIn = (files: readonly string[], marker: Marker = 'Case'): string[] =>
