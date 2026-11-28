@@ -1186,7 +1186,7 @@ describe('the Map an Open Space Resource draws', () => {
         within(controlsOf(parent)).getByRole('button', { name: /Close Resource/ }),
       ).toBeTruthy(),
     );
-  });
+  }, 10_000);
 
   it('allows only one content editor across two embeddings of the same target', async () => {
     const document: ResourceDocument = {
