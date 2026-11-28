@@ -20,8 +20,8 @@ import { useResourceHost } from './host';
  * capabilities are present.
  */
 
-/** A Map content commit, which may carry a size hint on an author's gesture. */
-export type MapCommit<M> = (next: M, options?: { readonly sizeHint?: Size }) => Promise<Answer>;
+/** A Map content commit. */
+export type MapCommit<M> = (next: M) => Promise<Answer>;
 
 /** A Map content value and its commit, when the surface offers one. */
 export interface KeptMap<M> {
@@ -55,6 +55,21 @@ export interface Claim {
    * that ends and then releases it, so a plugin never retries a release.
    */
   release(): void;
+}
+
+/**
+ * A Claim taken to edit in place (ADR 0178): while it is held, the canvas
+ * draws the Resource at its Edit size, and a resize writes that size rather
+ * than the Resource's own. A `sizeHint` is what the editor is drawn at, at
+ * least, while no Edit size is stored; it stores nothing.
+ */
+export interface InPlaceEdit {
+  readonly sizeHint?: Size | undefined;
+}
+
+/** How a plugin takes its Claim. `inPlace` opts in to editing in place. */
+export interface ClaimOptions {
+  readonly inPlace?: InPlaceEdit | undefined;
 }
 
 /**
@@ -122,7 +137,7 @@ export interface Surface<C, M> {
   readonly map: KeptMap<M>;
   readonly size: Size;
   readonly selected: boolean;
-  readonly claim?: (() => OwnClaim<C, M> | undefined) | undefined;
+  readonly claim?: ((options?: ClaimOptions) => OwnClaim<C, M> | undefined) | undefined;
   readonly assets: Assets;
   /** One component for the surface's lifetime: unmounting releases, so a new type per render would release every Claim inside it. */
   readonly Embed: ComponentType<EmbedProps>;
@@ -360,6 +375,47 @@ export interface SourceEditorProps {
  * held by `packages/ui/test/canvas-resource-title-ladder.test.ts`.
  */
 export const RAIL_BAND = 30;
+
+/**
+ * The glyph of the rail command that Opens a Resource: show its detail.
+ *
+ * Lucide's `AlignJustify` artwork, three full lines, drawn here rather than
+ * imported because the Resource API depends on no icon library and its pair,
+ * `CloseIcon`, is not a Lucide glyph; the deviation is recorded in
+ * `interactiveDeviations` (`packages/app/stories/design-system-inventory.ts`).
+ * Both are 14px, as every rail glyph is.
+ */
+export const OpenIcon = () => <ResourceLines middle />;
+
+/**
+ * The glyph of the rail command that Closes a Resource: back to its summary.
+ *
+ * `OpenIcon` without its middle line. No Lucide glyph says "this Resource's
+ * summary, not its detail", a meaning only InfinityCube's Open and Closed
+ * Resources have, so this is a custom glyph by UI-3.
+ */
+export const CloseIcon = () => <ResourceLines middle={false} />;
+
+function ResourceLines({ middle }: { readonly middle: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 5h18" />
+      {middle ? <path d="M3 12h18" /> : null}
+      <path d="M3 19h18" />
+    </svg>
+  );
+}
 
 /** The words of a settled commit's refusal, or `null` where it completed or changed nothing. */
 export const refusalOf = (answer: Answer): string | null =>

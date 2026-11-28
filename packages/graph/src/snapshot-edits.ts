@@ -35,8 +35,8 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `resize`, `changeMapContent`, `addToMap` and `removeFromMap` are Space
- * Authoring's alone.
+ * `resize`, `resizeEditor`, `changeMapContent`, `addToMap` and
+ * `removeFromMap` are Space Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -286,6 +286,12 @@ const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
 
 const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
 
+/** Round each axis to a whole number and floor it at the Closed Size. */
+const flooredSize = (size: Extent): Extent => ({
+  width: Math.max(Math.round(size.width), COLLAPSED_RESOURCE_SIZE.width),
+  height: Math.max(Math.round(size.height), COLLAPSED_RESOURCE_SIZE.height),
+});
+
 /**
  * Resize a Resource in one Map, moving the Resources clear of it by the change
  * from the size it had (ADR 0084, ADR 0093). The size is written even when it
@@ -313,24 +319,50 @@ function resize(
 }
 
 /**
+ * Write a Resource's Edit size in one Map (ADR 0178): the size the canvas
+ * draws it at while its plugin edits it in place. Its `size`, its Map content
+ * and every other Resource are kept, so nothing is displaced. `unchanged` for
+ * the Edit size it already stores. Each axis is rounded and floored at the
+ * Closed Size, so a value below it is written at the floor rather than refused.
+ */
+function resizeEditor(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  editSize: Extent,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
+    return refused({ code: 'resource-not-found' });
+  }
+  const floored = flooredSize(editSize);
+  if (at.editSize?.width === floored.width && at.editSize.height === floored.height) {
+    return UNCHANGED;
+  }
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, { ...at, editSize: floored }),
+  );
+}
+
+/**
  * Write a Resource's Map content in one Map (ADR 0142): what its plugin keeps
  * for it there, as an Ur Resource keeps its Shape (ADR 0121). The plugin's own
  * schema decides what is accepted.
  *
- * Alone it changes no rect, so no neighbour moves and the Resource's size is
- * kept. A size hint, which a plugin's gesture may carry (ADR 0142), is applied
- * in this same Edit only on an entry with no stored size: floored at the Closed
- * Size and applied as a Resize is, moving the Resources its growth passes. An
- * entry with a stored size ignores it. `unchanged` for the value the plugin is
- * already given there, whatever the hint, so the plugin's default is
- * `unchanged` on an entry that stores none.
+ * It changes no rect, so no neighbour moves and the Resource's size is kept.
+ * `unchanged` for the value the plugin is already given there, so the plugin's
+ * default is `unchanged` on an entry that stores none.
  */
 function changeMapContent(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
   content: JsonValue,
-  sizeHint?: Extent,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -343,19 +375,11 @@ function changeMapContent(
     return refused({ code: 'map-content-invalid' });
   }
   if (sameJsonValue(resolvedMapContent(kind, at.content), content)) return UNCHANGED;
-  const written = withPlacement(
+  return withPlacement(
     snapshot,
     mapId,
     Placement.place(placed.placement, resourceId, { ...at, content }),
   );
-  if (sizeHint === undefined || at.size !== undefined || written.kind !== 'completed') {
-    return written;
-  }
-  const resized = resize(written.snapshot, mapId, resourceId, {
-    width: Math.max(Math.round(sizeHint.width), COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(Math.round(sizeHint.height), COLLAPSED_RESOURCE_SIZE.height),
-  });
-  return resized.kind === 'completed' ? resized : written;
 }
 
 /**
@@ -429,6 +453,7 @@ export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
   resize,
+  resizeEditor,
   changeMapContent,
   addToMap,
   removeFromMap,

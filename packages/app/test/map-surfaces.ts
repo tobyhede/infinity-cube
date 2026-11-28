@@ -26,6 +26,7 @@ export function holdCanvasPolicy(surface: MapSurface, policy: MapSurfacePolicy):
 const ignore = (): void => undefined;
 
 const IDLE_RESIZE: ResourceResize = {
+  drawEditors: ignore,
   beginResize: ignore,
   previewResize: ignore,
   finishResize: ignore,
