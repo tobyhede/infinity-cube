@@ -152,7 +152,6 @@ mod given_a_database_that_does_not_answer {
     use super::*;
 
     // TypeScript case: composes an application when the repository cannot be reached
-    // TypeScript case: trims a configured DATABASE_URL
     #[test]
     fn announces_and_answers_503_from_a_trimmed_database_url_in_the_nearest_env() {
         let directory = tempfile::tempdir().unwrap();
