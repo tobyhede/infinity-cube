@@ -85,6 +85,7 @@ export function editorPlacement(
   placement: Placement,
   editors: ReadonlyMap<ResourceId, EditorSizing>,
   cap?: ResourceSize,
+  neighbours?: ReadonlySet<ResourceId>,
 ): Placement {
   let drawn = placement;
   for (const [resourceId, editor] of editors) {
@@ -93,9 +94,26 @@ export function editorPlacement(
     const size = resourceSize(at);
     const capped = cappedSize(at.editSize ?? editor.suggestedSize ?? size, cap);
     if (capped.width === size.width && capped.height === size.height) continue;
-    drawn = Placement.place(drawn, resourceId, { ...at, size: capped });
+    const displaced = Placement.displace(drawn, resourceId, size, capped, neighbours);
+    drawn = Placement.place(displaced, resourceId, { ...at, size: capped });
   }
   return drawn;
+}
+
+function drawResizeDraft(
+  draft: ResizeDraft,
+  placement: Placement,
+  cap: ResourceSize | undefined,
+): ResizeDraft | null {
+  const at = placement.get(draft.resourceId);
+  if (at === undefined) return null;
+  const size = draft.requestedSize;
+  if (size === undefined) return { ...draft, placement };
+  const drawn = draft.editor ? cappedSize(size, cap) : size;
+  return {
+    ...draft,
+    placement: Placement.place(placement, draft.resourceId, { ...at, size: drawn }),
+  };
 }
 
 const sameEditors = (
@@ -281,6 +299,8 @@ export interface RenderAdapterState {
   resizeDraft: ResizeDraft | null;
   /** The Resources edited on this canvas (`ResourceResize.drawEditors`). */
   editors: ReadonlyMap<ResourceId, EditorSizing>;
+  /** Members present at Claim start that have not since been deliberately moved. */
+  editorNeighbours: ReadonlySet<ResourceId>;
   /** The most an editor is drawn at (`ResourceResize.drawEditors`). */
   editorCap: ResourceSize | undefined;
   /**
@@ -384,13 +404,13 @@ function trackDragOrigins(
 }
 
 /**
- * The moved Resources' own drop points, exactly: which settled changes actually
- * ended somewhere other than where the drag began, and where.
+ * A settled Resource takes its exact drop point. Returning to the gesture's
+ * start changes nothing, including when the editor drew it aside.
  *
  * Each change is keyed through `owned`, the identities of the canvas Map's own
  * nodes, so a change for a node this store does not draw contributes nothing.
  *
- * Answers the drop points directly rather than a list of ids — Authoring
+ * Answers the stored points directly rather than a list of ids — Authoring
  * merges these over the Map's own positions at derivation, so there is no
  * second lookup back into `nodes` for a caller to get wrong.
  */
@@ -523,6 +543,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     selection: NO_SELECTION,
     resizeDraft: null,
     editors: new Map(),
+    editorNeighbours: new Set(),
     editorCap: undefined,
     editingEmbeddedMap: false,
 
@@ -531,41 +552,36 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     resourceResize: {
       drawEditors: (editors, cap) => {
         const now = get();
-        const next: Partial<RenderAdapterState> = {};
-        if (!sameEditors(now.editors, editors)) {
-          next.editors = editors;
-          // A draft started at the rect drawn before would write the other
-          // size from it, so a change to whether its Resource is edited ends it.
-          const draft = now.resizeDraft;
-          if (draft !== null && now.editors.has(draft.resourceId) !== editors.has(draft.resourceId))
-            next.resizeDraft = null;
+        const nextEditors = sameEditors(now.editors, editors) ? now.editors : editors;
+        const nextCap = sameSize(now.editorCap, cap) ? now.editorCap : cap;
+        if (nextEditors === now.editors && nextCap === now.editorCap) return;
+        const sameClaim =
+          editors.size === now.editors.size &&
+          [...editors.keys()].every((id) => now.editors.has(id));
+        const editorNeighbours = sameClaim
+          ? now.editorNeighbours
+          : new Set(editors.size ? authoring.mapPlacement().keys() : []);
+        let draft = now.resizeDraft;
+        if (draft !== null) {
+          const changedMode = (draft.editor !== undefined) !== editors.has(draft.resourceId);
+          const changedEditorCap = draft.editor !== undefined && nextCap !== now.editorCap;
+          draft =
+            changedMode || changedEditorCap
+              ? null
+              : drawResizeDraft(
+                  draft,
+                  editorPlacement(authoring.mapPlacement(), editors, cap, editorNeighbours),
+                  cap,
+                );
         }
-        if (!sameSize(now.editorCap, cap)) {
-          next.editorCap = cap;
-          // The cap draws an editor at another rect, so it ends a draft of an
-          // editor for the same reason; a Resource not edited is
-          // drawn uncapped, and its draft goes on.
-          if (now.resizeDraft?.editor !== undefined) next.resizeDraft = null;
-        }
-        if (Object.keys(next).length === 0) return;
-        const draft = now.resizeDraft;
-        if (draft !== null && next.resizeDraft !== null && draft.editor === undefined) {
-          const placement = editorPlacement(authoring.mapPlacement(), editors, cap);
-          const current = draft.placement.get(draft.resourceId);
-          if (current !== undefined)
-            next.resizeDraft = {
-              ...draft,
-              placement: Placement.place(placement, draft.resourceId, current),
-            };
-        }
-        set(next);
+        set({ editors: nextEditors, editorNeighbours, editorCap: nextCap, resizeDraft: draft });
       },
 
       beginResize: (resourceId) => {
         // Pointer movement starts from the rect the author sees.
-        const { editors, editorCap } = get();
+        const { editors, editorCap, editorNeighbours } = get();
         const authored = authoring.mapPlacement();
-        const placement = editorPlacement(authored, editors, editorCap);
+        const placement = editorPlacement(authored, editors, editorCap, editorNeighbours);
         const at = placement.get(resourceId);
         if (at === undefined) return;
         const sizing = editors.get(resourceId);
@@ -583,16 +599,12 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       previewResize: (resourceId, size) => {
         const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
-        const at = draft.placement.get(resourceId);
-        if (at === undefined) return;
-        const drawn = draft.editor ? cappedSize(size, get().editorCap) : size;
         set({
-          resizeDraft: {
-            ...draft,
-            requestedSize:
-              draft.editor === undefined ? size : resizedEditorSize(draft.editor, drawn),
-            placement: Placement.place(draft.placement, resourceId, { ...at, size: drawn }),
-          },
+          resizeDraft: drawResizeDraft(
+            { ...draft, requestedSize: size },
+            draft.placement,
+            get().editorCap,
+          ),
         });
       },
 
@@ -600,11 +612,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
         if (draft.requestedSize !== undefined) {
-          authoring.complete(
-            draft.editor
-              ? { kind: 'resized-editor', resourceId, editSize: draft.requestedSize }
-              : { kind: 'resized-resource', resourceId, size: draft.requestedSize },
-          );
+          if (draft.editor === undefined) {
+            authoring.complete({ kind: 'resized-resource', resourceId, size: draft.requestedSize });
+          } else {
+            const drawn = cappedSize(draft.requestedSize, get().editorCap);
+            const editSize = resizedEditorSize(draft.editor, drawn);
+            if (editSize !== undefined)
+              authoring.complete({ kind: 'resized-editor', resourceId, editSize });
+          }
         }
         set({ resizeDraft: null });
       },
@@ -645,6 +660,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     selectMap: () => {
       set({
         projection: null,
+        editors: new Map(),
+        editorNeighbours: new Set(),
         dragOrigins: new Map(),
         selection: NO_SELECTION,
         resizeDraft: null,
@@ -713,9 +730,11 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // the proposed rect on (`ResourceNode`), so that change is never produced and
       // this store never has a split frame to refuse. The draft is what makes
       // the resized Resource, its handles and its Edges one publication — and only
-      // those: its neighbours are drawn from the authored placement and do not
-      // move until the Edit lands (ADR 0084). `SpaceCanvas.test.tsx` drives the
-      // real control and holds the whole gesture to proposing nothing here.
+      // those: its neighbours are drawn where the draft began them, at the Map's
+      // positions or aside from them by an editor (ADR 0178), and the
+      // resize moves none of them until the Edit lands (ADR 0084).
+      // `SpaceCanvas.test.tsx` drives the real control and holds the whole
+      // gesture to proposing nothing here.
       const relevant = changes.filter((change) => !('id' in change) || owned.has(change.id));
       if (relevant.length === 0) return;
 
@@ -777,7 +796,15 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         dragOrigins,
         selection,
       });
-      authoring.complete({ kind: 'settled-resource-movement', moved });
+      const result = authoring.complete({ kind: 'settled-resource-movement', moved });
+      if (result.kind === 'completed' || result.kind === 'unchanged') {
+        const current = get();
+        if (current.editorNeighbours === state.editorNeighbours && current.editorNeighbours.size) {
+          const remaining = new Set(current.editorNeighbours);
+          for (const id of moved.keys()) remaining.delete(id);
+          set({ editorNeighbours: remaining });
+        }
+      }
     },
 
     changeEdges: (changes) => {
@@ -821,6 +848,8 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     replacementEpoch = nextEpoch;
     adapter.setState({
       projection: null,
+      editors: new Map(),
+      editorNeighbours: new Set(),
       dragOrigins: new Map(),
       selection: NO_SELECTION,
       resizeDraft: null,
